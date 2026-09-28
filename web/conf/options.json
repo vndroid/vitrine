@@ -1,0 +1,430 @@
+{
+    /*
+    Password hash.
+
+    Hash of the info page password. The admin login is disabled as long as
+    no password is set (empty string, or the former preset: the SHA512 hash
+    of the empty string).
+
+    Recommended: a bcrypt hash, e.g. generated with
+        vitrine passwd
+    Hashes created by PHP's password_hash() (bcrypt or argon2) and plain
+    SHA512 hex digests are still accepted for compatibility with h5fs.
+
+    After 5 failed logins within 15 minutes a client is locked out for 15 minutes.
+    */
+    "passhash": "",
+
+
+
+    /*
+    Resources.
+
+    Additional script and style tags added to all pages. Paths not beginning
+    with "http://", "https://" or "/" will be looked up relative to the "ext"
+    folder of the config directory (no check for existence).
+
+    - scripts: array of strings
+    - styles: array of strings
+    */
+    "resources": {
+        "scripts": [],
+        "styles": [
+            "//fonts.googleapis.com/css?family=Ubuntu:300,400,700%7CUbuntu+Mono:400,700"
+        ]
+    },
+
+
+
+    /*
+    General view options.
+
+    - binaryPrefix: boolean, set to true uses 1024B=1KiB when formatting file sizes (see http://en.wikipedia.org/wiki/Binary_prefix)
+    - disableSidebar: boolean, hides sidebar and toggle button
+    - fallbackMode: boolean, serve fallback mode
+    - fastBrowsing: boolean, use History API if available (no need to reload the whole page)
+    - fonts: array of strings, fonts to use in regular context
+    - fontsMono: array of strings, fonts to use in monopspaced context
+    - hidden: array of strings, don't list items matching these regular expressions
+    - hideFolders: boolean, hide all folders in the main view
+    - hideIf403: boolean, hide files and folders that are not readable by the server
+    Hidden entries are neither listed nor served.
+    - hideParentFolder: boolean, hide parent folder links in the main view
+    - maxIconSize: number, max size for icons in the main view
+    - modes: array of strings, subset of ["details", "grid", "icons"]
+        the first value indicates the default view mode. If only one value
+        is given the view mode is fixed and the selector buttons are hidden.
+        The user selected view mode is also stored local in modern browsers
+        so that it will be persistent.
+    - modeToggle: boolean, show a view mode toggle in the toolbar, or "next"
+    - setParentFolderLabels: boolean, set parent folder labels to real folder names
+    - sizes: array of numbers
+        the first value indicates the default view size. If only one value
+        is given the view size is fixed and the selector buttons are hidden.
+        The user selected view size is also stored local in modern browsers
+        so that it will be persistent.
+    - theme: string, name of one of the bundled icon themes ("default" or "comity")
+    - unmanaged: array of strings, don't manage folders containing one of those files,
+        the first one found is served as the folder's index instead
+    - unmanagedInNewWindow: boolean, open unmanaged links in new window/tab
+    */
+    "view": {
+        "binaryPrefix": false,
+        "disableSidebar": false,
+        "fallbackMode": false,
+        "fastBrowsing": true,
+        "fonts": ["Ubuntu", "Roboto", "Helvetica", "Arial", "sans-serif"],
+        "fontsMono": ["Ubuntu Mono", "Monaco", "Lucida Sans Typewriter", "monospace"],
+        "hidden": ["^\\.", "^_vitrine", "^_h5fs"],
+        "hideFolders": false,
+        "hideIf403": true,
+        "hideParentFolder": false,
+        "maxIconSize": 40,
+        "modes": ["details", "grid", "icons"],
+        "modeToggle": false,
+        "setParentFolderLabels": true,
+        "sizes": [20, 40, 60, 80, 100, 140, 180, 220, 260, 300],
+        "theme": "comity",
+        "unmanaged": ["index.html", "index.htm", "index.php"],
+        "unmanagedInNewWindow": false
+    },
+
+
+
+    /*** Extensions (in alphabetical order) ***/
+
+    /*
+    Watch and update current folder content.
+
+    - interval: number, update interval in milliseconds, at least 1000
+    */
+    "autorefresh": {
+        "enabled": false,
+        "interval": 5000
+    },
+
+    /*
+    Show a clickable breadcrumb.
+    */
+    "crumb": {
+        "enabled": true
+    },
+
+    /*
+    Allow customized header and footer files.
+    First checks for files "_vitrine.header.html" and "_vitrine.footer.html" in the current directory.
+    If not successful it checks all parent directories (starting in the current directory) for
+    files "_vitrine.headers.html" and "_vitrine.footers.html".
+    The former "_h5fs." file name prefix is still accepted.
+    Note the different filenames: "header" (only current) - "headers" (current and sub directories)!
+    The file's content will be placed inside a <div/> tag above/below the main content.
+    If a file's extension is ".md" instead of ".html" its content will be interpreted as markdown.
+
+    - stopSearchingAtRoot: boolean, only search for header and footer files until the web root
+        directory. if `false`, will search for header/footer up the entire directory structure,
+        even above the web root
+    */
+    "custom": {
+        "enabled": true,
+        "stopSearchingAtRoot": true
+    },
+
+    /*
+    Enable packaged download of selected entries.
+    To select files the "select"-extension needs to be enabled.
+
+    - type: string, "php-tar" or "shell-tar" for a tar, "shell-zip" for a zip package
+        (names kept for compatibility, all packages are built by vitrine itself)
+    - packageName: string, basename of the download package, null for current filename or foldername
+    - alwaysVisible: boolean, always show download button (defaults to download the current folder)
+    - maxConcurrent: number, max number of downloads running at the same time
+    - maxConcurrentPerClient: number, max number of simultaneous downloads per client address
+        (IPv6 clients are grouped by /64; behind a reverse proxy all clients share
+        the proxy's address unless it is listed with the --trusted-proxy flag)
+    - maxDuration: number, max duration of a single download in seconds
+    - minRate: number, abort downloads that are consumed slower than this (bytes per second), 0 to disable
+    - minRateGrace: number, seconds before minRate is enforced
+    */
+    "download": {
+        "enabled": true,
+        "type": "php-tar",
+        "packageName": null,
+        "alwaysVisible": false,
+        "maxConcurrent": 4,
+        "maxConcurrentPerClient": 1,
+        "maxDuration": 3600,
+        "minRate": 32768,
+        "minRateGrace": 30
+    },
+
+    /*
+    Allow filtering the displayed files and folders in current folder.
+    Checks for substrings.
+
+    If advanced is enabled it checks entries for right order of characters,
+    i.e. "ab" matches "ab", "axb", "xaxbx" but not "ba". Space separated
+    sequences get OR-ed. Searches will be treated as JavaScript regular
+    expressions if you prefix them with "re:".
+
+    - advanced: boolean, use advanced pattern parsing
+    - debounceTime: number, debounce wait time in milliseconds
+    - ignorecase: boolean, ignore case
+    */
+    "filter": {
+        "enabled": false,
+        "advanced": true,
+        "debounceTime": 100,
+        "ignorecase": true
+    },
+
+    /*
+    Calc the size of folders.
+    This operation is real slow. The calculated sizes differ slightly for both
+    calculation types since "php" only adds the file sizes, while "shell-du"
+    also adds the sizes for the actual folder files.
+
+    - type: string, "php" (sums up file sizes, name kept for compatibility)
+        or "shell-du" (runs "du", needs it to be installed)
+    */
+    "foldersize": {
+        "enabled": true,
+        "type": "php"
+    },
+
+    /*
+    Adds Google Universial Analytics asynchronous tracking code.
+    see: https://developers.google.com/analytics/devguides/collection/analyticsjs/
+
+    - id: string, account ID
+    */
+    "google-tag-id": {
+        "enabled": false,
+        "id": "G-0000000000"
+    },
+
+    /*
+    Enable a generic info side bar.
+
+    - show: boolean, initial visible to first time users
+    - qrcode: boolean, show a QR-Code
+    - qrColor: string, QR-Code fill color
+    */
+    "info": {
+        "enabled": true,
+        "show": false,
+        "qrcode": true,
+        "qrFill": "#999",
+        "qrBack": "#fff"
+    },
+
+    /*
+    Localization, for example "en", "de" etc. - see the "l10n" folder of the
+    config directory for possible values. Adjust it to your needs. If lang is not found
+    it defaults to "en".
+
+    - lang: string, default language
+    - useBroserLang: boolean, try to use browser language
+    */
+    "l10n": {
+        "enabled": true,
+        "lang": "en",
+        "useBrowserLang": true
+    },
+
+    /*
+    Adds Piwik tracker javascript code.
+
+    - baseURL: string, do not include the protocol, e.g. "mydomain.tld/piwik"
+    - idSite: number
+    */
+    "piwik-analytics": {
+        "enabled": false,
+        "baseURL": "some/url",
+        "idSite": 1
+    },
+
+    /*
+    Play a audio preview on click.
+
+    - autoplay: start playing as soon as ready
+    - types: array of strings
+    */
+    "preview-aud": {
+        "enabled": true,
+        "autoplay": true,
+        "types": ["aud"]
+    },
+
+    /*
+    Show an image preview on click.
+
+    - types: array of strings
+    - size: number, sample size, or false for original size
+    */
+    "preview-img": {
+        "enabled": true,
+        "size": false,
+        "types": ["img", "img-bmp", "img-gif", "img-ico", "img-jpg", "img-png", "img-raw", "img-svg"]
+    },
+
+    /*
+    Show text file preview on click.
+
+    Available styles are:
+      0: floating text
+      1: fixed width text
+      2: markdown
+      3: syntax highlighting
+
+    - styles: dict string to int, maps types to styles
+    */
+    "preview-txt": {
+        "enabled": true,
+        "styles": {
+            "txt": 1,
+            "txt-authors": 1,
+            "txt-c": 3,
+            "txt-cpp": 3,
+            "txt-css": 3,
+            "txt-diff": 1,
+            "txt-go": 3,
+            "txt-h": 3,
+            "txt-hpp": 3,
+            "txt-install": 1,
+            "txt-js": 3,
+            "txt-json": 3,
+            "txt-less": 3,
+            "txt-license": 1,
+            "txt-log": 1,
+            "txt-makefile": 1,
+            "txt-md": 2,
+            "txt-py": 3,
+            "txt-rb": 3,
+            "txt-readme": 1,
+            "txt-rtf": 1,
+            "txt-rust": 3,
+            "txt-script": 3,
+            "txt-xml": 1
+        }
+    },
+
+    /*
+    Play a video preview on click.
+
+    - autoplay: start playing as soon as ready
+    - types: array of strings
+    */
+    "preview-vid": {
+        "enabled": true,
+        "autoplay": true,
+        "types": ["vid-avi", "vid-flv", "vid-mkv", "vid-mov", "vid-mp4", "vid-mpg", "vid-webm"]
+    },
+
+    /*
+    Allow searching files and folders in and below current folder.
+    Checks for substrings.
+
+    If advanced is enabled it checks entries for right order of characters,
+    i.e. "ab" matches "ab", "axb", "xaxbx" but not "ba". Space separated
+    sequences get OR-ed. Searches will be treated as JavaScript regular
+    expressions if you prefix them with "re:".
+
+    - advanced: boolean, use advanced pattern parsing
+    - debounceTime: number, debounce wait time in milliseconds
+    - ignorecase: boolean, ignore case
+    */
+    "search": {
+        "enabled": false,
+        "advanced": true,
+        "debounceTime": 300,
+        "ignorecase": true
+    },
+
+    /*
+    Make entries selectable.
+    At the moment only needed for packaged download.
+
+    - clickndrag: boolean, allow first mouse button + drag selection
+    - checkboxes: boolean, show a checkbox on mouse over item
+    */
+    "select": {
+        "enabled": true,
+        "clickndrag": true,
+        "checkboxes": true
+    },
+
+    /*
+    Default sort order.
+    "column" and "reverse" are locally stored.
+
+    - column: number, 0 for "Name", 1 for "Date", 2 for "Size"
+    - reverse: boolean, false for ascending, true for descending
+    - ignorecase: boolean, compare ignorecase
+    - natural: boolean, use natural sort order
+    - folders: number, where to place folders, 0 for "top", 1 for "in place", 2 for "bottom"
+    */
+    "sort": {
+        "enabled": true,
+        "column": 0,
+        "reverse": false,
+        "ignorecase": true,
+        "natural": true,
+        "folders": 0
+    },
+
+    /*
+    Show thumbnails for image files. Thumbnails are stored in the cache
+    directory (--cache flag).
+
+    - img: array of strings, file types (see "types.json") rendered by vitrine,
+        supported: img-bmp, img-gif, img-jpg, img-png
+    - mov: array of strings, file types captured with ffmpeg/avconv, supported:
+        vid-avi, vid-flv, vid-mkv, vid-mov, vid-mp4, vid-mpg, vid-ts, vid-vob, vid-webm, vid-wmv
+    - doc: array of strings, file types captured with ImageMagick/GraphicsMagick, supported:
+        x-pdf, x-ps, x-eps
+      The thumbnail type is always derived on the server from the file name,
+      files are only passed to these tools with an explicit input format.
+    - delay: number, delay in milliseconds after "dom-ready" before thumb-requesting starts
+    - size: number, size in pixel of the generated thumbnails
+        (only this size and "preview-img.size" are generated on request)
+    - exif: boolean, use included EXIF thumbs if possible
+    - chunksize: int, number of thumbs per request
+    - maxCacheSize: number, max disk usage of the thumbnail cache in MiB,
+        least recently used thumbnails are removed when it is exceeded
+    */
+    "thumbnails": {
+        "enabled": true,
+        "img": ["img-bmp", "img-gif", "img-ico", "img-jpg", "img-png"],
+        "mov": ["vid-avi", "vid-flv", "vid-mkv", "vid-mov", "vid-mp4", "vid-mpg", "vid-webm"],
+        "doc": ["x-pdf", "x-ps"],
+        "delay": 1,
+        "size": 240,
+        "exif": false,
+        "chunksize": 20,
+        "maxCacheSize": 512
+    },
+
+    /*
+    Replace window title with current breadcrumb.
+    */
+    "title": {
+        "enabled": true
+    },
+
+    /*
+    Show a folder tree.
+    Note that this might affect performance significantly.
+
+    - show: boolean, initial visible to first time users
+    - maxSubfolders: number, max number of subfolders to show in tree
+    - naturalSort: boolean, use natural sort order for folders
+    - ignorecase: boolean, sort ignorecase
+    */
+    "tree": {
+        "enabled": true,
+        "show": true,
+        "maxSubfolders": 50,
+        "naturalSort": true,
+        "ignorecase": true
+    }
+}
