@@ -164,7 +164,8 @@ func TestUnmanagedIndex(t *testing.T) {
 func TestReadDir(t *testing.T) {
 	tr, root := fixture(t)
 	got := strings.Join(tr.ReadDir(root), ",")
-	want := "a.txt,cache,file-out,link-hidden,link-in,link-out,my file#1.txt,site,sub"
+	// links leaving the root (file-out, link-out) are not listed
+	want := "a.txt,cache,link-hidden,link-in,my file#1.txt,site,sub"
 	if got != want {
 		t.Errorf("ReadDir = %s\nwant      %s", got, want)
 	}

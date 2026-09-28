@@ -135,6 +135,14 @@ func (t *Tree) ReadDir(path string) []string {
 		if hideIf403 && !readable(filepath.Join(path, name)) {
 			continue
 		}
+		// links leaving the root can't be served, don't list them (and the
+		// size and time of their targets) either
+		if e.Type()&os.ModeSymlink != 0 {
+			real, err := filepath.EvalSymlinks(filepath.Join(path, name))
+			if err != nil || !within(real, t.root) {
+				continue
+			}
+		}
 		names = append(names, name)
 	}
 	sort.Strings(names)

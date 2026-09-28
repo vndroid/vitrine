@@ -345,3 +345,15 @@ func TestHeadTagsEscaping(t *testing.T) {
 		t.Errorf("relative resource should point to ext")
 	}
 }
+
+// A config directory with a partial options.json once dropped the default
+// hidden patterns and served dotfiles (found on a real deployment).
+func TestPartialOptionsKeepDotfilesPrivate(t *testing.T) {
+	s, _ := newTestServer(t, fixtureOpts{options: `{"search": {"enabled": true}}`})
+	if rec := do(s, "GET", "/.secret", "", nil); rec.Code != 404 {
+		t.Errorf("GET /.secret = %d", rec.Code)
+	}
+	if strings.Contains(do(s, "GET", "/", "", nil).Body.String(), ".secret") {
+		t.Error(".secret listed")
+	}
+}

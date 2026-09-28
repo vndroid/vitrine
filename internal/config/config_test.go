@@ -157,3 +157,21 @@ func (r *bytesReader) Read(p []byte) (int, error) {
 	r.b = r.b[n:]
 	return n, nil
 }
+
+func TestPartialOverrideKeepsDefaults(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "options.json"), []byte(`{"passhash": "x", "search": {"enabled": true}}`), 0o600)
+	c, err := Load(dir, web.Conf())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.IsHidden(".env") || !c.IsHidden("_vitrine.header.md") {
+		t.Error("a partial options.json must keep the default hidden patterns")
+	}
+	if !c.Bool("search.enabled", false) || c.Int("search.debounceTime", 0) != 300 {
+		t.Error("objects must be merged key by key")
+	}
+	if c.String("view.theme", "") != "comity" {
+		t.Error("untouched defaults must stay")
+	}
+}

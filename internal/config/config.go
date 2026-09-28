@@ -45,15 +45,26 @@ func Load(dir string, defaults fs.FS) (*Config, error) {
 	src := layered{dir: dir, defaults: defaults}
 	c := &Config{}
 
-	raw, err := src.read("options.json")
+	// options.json of the config directory is merged over the defaults, so
+	// a partial file can't drop defaults like the hidden patterns
+	raw, err := fs.ReadFile(defaults, "options.json")
 	if err != nil {
 		return nil, err
 	}
 	if err := decode(raw, &c.options); err != nil {
-		return nil, fmt.Errorf("options.json: %w", err)
+		return nil, fmt.Errorf("default options.json: %w", err)
 	}
 	if c.options == nil {
 		c.options = map[string]any{}
+	}
+	if raw, ok, err := src.readOverride("options.json"); err != nil {
+		return nil, err
+	} else if ok {
+		var override map[string]any
+		if err := decode(raw, &override); err != nil {
+			return nil, fmt.Errorf("options.json: %w", err)
+		}
+		merge(c.options, override)
 	}
 	if s, ok := c.options["passhash"].(string); ok {
 		c.passhash = strings.TrimSpace(s)
@@ -346,6 +357,32 @@ func (l layered) read(name string) ([]byte, error) {
 		}
 	}
 	return fs.ReadFile(l.defaults, name)
+}
+
+// readOverride reads a file of the config directory only.
+func (l layered) readOverride(name string) ([]byte, bool, error) {
+	if l.dir == "" {
+		return nil, false, nil
+	}
+	b, err := os.ReadFile(filepath.Join(l.dir, filepath.FromSlash(name)))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, false, nil
+	}
+	return b, err == nil, err
+}
+
+// merge deep merges src into dst: objects are merged key by key, any
+// other value (arrays included) replaces the default.
+func merge(dst, src map[string]any) {
+	for k, v := range src {
+		sm, srcIsMap := v.(map[string]any)
+		dm, dstIsMap := dst[k].(map[string]any)
+		if srcIsMap && dstIsMap {
+			merge(dm, sm)
+			continue
+		}
+		dst[k] = v
+	}
 }
 
 func (l layered) list(dir string) ([]string, error) {
