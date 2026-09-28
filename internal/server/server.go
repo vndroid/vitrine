@@ -20,6 +20,7 @@ import (
 	"github.com/vndroid/vitrine/internal/archive"
 	"github.com/vndroid/vitrine/internal/auth"
 	"github.com/vndroid/vitrine/internal/config"
+	"github.com/vndroid/vitrine/internal/thumb"
 	"github.com/vndroid/vitrine/internal/tree"
 )
 
@@ -58,6 +59,7 @@ type Server struct {
 	sessions *auth.Sessions
 	throttle *auth.Throttle
 	slots    *archive.Slots
+	thumb    *thumb.Service
 }
 
 // New creates a server.
@@ -83,6 +85,14 @@ func New(o Options) *Server {
 	}
 	s.cfg.SetLoginEnabled(auth.LoginEnabled(s.cfg.Passhash()))
 	s.detectCommands()
+	if o.CacheDir != "" {
+		ts, err := thumb.New(o.Tree, o.Config, o.CacheDir, s.hasCommand, s.log)
+		if err != nil {
+			s.log.Warn("thumbnails disabled", "err", err)
+		} else {
+			s.thumb = ts
+		}
+	}
 	return s
 }
 
