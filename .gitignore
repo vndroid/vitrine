@@ -1,0 +1,23 @@
+# build output
+/vitrine
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+coverage.*
+
+# runtime data: thumbnail cache, local shares and configs (may contain a passhash)
+/cache/
+/data/
+/share/
+/conf.local/
+*.local.json
+.env
+.env.*
+
+# editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
