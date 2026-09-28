@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/vndroid/vitrine/internal/archive"
 	"github.com/vndroid/vitrine/internal/auth"
 	"github.com/vndroid/vitrine/internal/config"
 	"github.com/vndroid/vitrine/internal/tree"
@@ -56,6 +57,7 @@ type Server struct {
 	commands atomic.Pointer[map[string]bool]
 	sessions *auth.Sessions
 	throttle *auth.Throttle
+	slots    *archive.Slots
 }
 
 // New creates a server.
@@ -71,6 +73,7 @@ func New(o Options) *Server {
 		log:      o.Logger,
 		sessions: auth.NewSessions(),
 		throttle: auth.NewThrottle(),
+		slots:    archive.NewSlots(),
 	}
 	if s.log == nil {
 		s.log = slog.Default()

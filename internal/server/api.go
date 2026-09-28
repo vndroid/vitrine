@@ -69,19 +69,22 @@ func parseParams(r *http.Request) (params, error) {
 	return formParams(values), nil
 }
 
-// formParams turns form keys like "hrefs[0]" into nested values.
+// formParams turns form keys like "hrefs[0]" into nested values. The
+// client sends "hrefs=" followed by "hrefs[0]=...", so like in PHP the
+// bracketed keys win over a plain key of the same name.
 func formParams(values url.Values) params {
 	p := params{}
 	for key, vals := range values {
-		if len(vals) == 0 {
+		if len(vals) > 0 && !strings.Contains(key, "[") {
+			p[key] = vals[len(vals)-1]
+		}
+	}
+	for key, vals := range values {
+		name, rest, nested := strings.Cut(key, "[")
+		if len(vals) == 0 || !nested {
 			continue
 		}
 		val := vals[len(vals)-1]
-		name, rest, nested := strings.Cut(key, "[")
-		if !nested {
-			p[name] = val
-			continue
-		}
 		sub, _, ok := strings.Cut(rest, "]")
 		if !ok {
 			p[key] = val
