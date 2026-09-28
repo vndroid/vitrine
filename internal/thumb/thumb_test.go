@@ -325,3 +325,28 @@ func TestVideoCapture(t *testing.T) {
 		t.Error("video thumbnail failed")
 	}
 }
+
+func TestDocCapture(t *testing.T) {
+	tool := ""
+	for _, c := range []string{"magick", "convert"} {
+		if _, err := exec.LookPath(c); err == nil {
+			tool = c
+			break
+		}
+	}
+	if tool == "" {
+		t.Skip("ImageMagick not installed")
+	}
+	base, _ := filepath.EvalSymlinks(t.TempDir())
+	root := filepath.Join(base, "root")
+	os.MkdirAll(root, 0o755)
+	if out, err := exec.Command(tool, "-size", "300x400", "gradient:white-black", filepath.Join(root, "d.pdf")).CombinedOutput(); err != nil {
+		t.Skipf("cannot create a pdf: %v %s", err, out)
+	}
+	cfg, _ := config.Load("", web.Conf())
+	tr, _ := tree.New(root, cfg)
+	s, _ := New(tr, cfg, filepath.Join(base, "cache"), func(c string) bool { _, err := exec.LookPath(c); return err == nil }, nil)
+	if _, ok := s.Thumb("doc", "/d.pdf", 240, 240); !ok {
+		t.Error("pdf thumbnail failed")
+	}
+}

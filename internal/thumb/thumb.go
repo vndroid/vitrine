@@ -255,6 +255,9 @@ func (s *Service) captureDoc(fileType, src string) (string, bool) {
 	// an explicit coder: the input is never auto-detected from its content
 	in := format + ":" + src + "[0]"
 	switch {
+	case s.hasCmd("magick"): // ImageMagick 7, where "convert" is deprecated
+		// operators like -strip have to follow the input in ImageMagick 7
+		return s.capture(src, []string{"magick", "-density", "200", in, "-quality", "100", "-strip", "jpg:"})
 	case s.hasCmd("convert"):
 		return s.capture(src, []string{"convert", "-density", "200", "-quality", "100", "-strip", in, "jpg:"})
 	case s.hasCmd("gm"):

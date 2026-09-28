@@ -206,7 +206,7 @@ func unescape(p string) (string, error) {
 	return b.String(), nil
 }
 
-var checkedCommands = []string{"avconv", "convert", "du", "ffmpeg", "gm", "tar", "zip"}
+var checkedCommands = []string{"avconv", "convert", "du", "ffmpeg", "gm", "magick", "tar", "zip"}
 
 func (s *Server) detectCommands() {
 	cmds := map[string]bool{}
@@ -248,6 +248,8 @@ func (s *Server) setupInfo(admin bool) map[string]any {
 	for _, c := range checkedCommands {
 		setup["HAS_CMD_"+strings.ToUpper(c)] = s.hasCommand(c)
 	}
+	// the info page checks "convert", ImageMagick 7 installs "magick"
+	setup["HAS_CMD_CONVERT"] = s.hasCommand("convert") || s.hasCommand("magick")
 	return setup
 }
 
