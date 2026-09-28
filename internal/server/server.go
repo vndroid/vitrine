@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/vndroid/vitrine/internal/auth"
 	"github.com/vndroid/vitrine/internal/config"
 	"github.com/vndroid/vitrine/internal/tree"
 )
@@ -53,6 +54,8 @@ type Server struct {
 	trusted  []netip.Prefix
 	log      *slog.Logger
 	commands atomic.Pointer[map[string]bool]
+	sessions *auth.Sessions
+	throttle *auth.Throttle
 }
 
 // New creates a server.
@@ -66,6 +69,8 @@ func New(o Options) *Server {
 		version:  o.Version,
 		trusted:  o.TrustedProxies,
 		log:      o.Logger,
+		sessions: auth.NewSessions(),
+		throttle: auth.NewThrottle(),
 	}
 	if s.log == nil {
 		s.log = slog.Default()
@@ -73,6 +78,7 @@ func New(o Options) *Server {
 	if o.ConfigDir != "" {
 		s.extDir = filepath.Join(o.ConfigDir, "ext")
 	}
+	s.cfg.SetLoginEnabled(auth.LoginEnabled(s.cfg.Passhash()))
 	s.detectCommands()
 	return s
 }

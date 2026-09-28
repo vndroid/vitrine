@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -12,22 +13,34 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/vndroid/vitrine/internal/auth"
 	"github.com/vndroid/vitrine/internal/config"
 	"github.com/vndroid/vitrine/internal/server"
 	"github.com/vndroid/vitrine/internal/tree"
 	"github.com/vndroid/vitrine/web"
+	"golang.org/x/term"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
 var version = ""
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Println(buildVersion())
-		return
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "version":
+			fmt.Println(buildVersion())
+			return
+		case "passwd":
+			if err := passwd(); err != nil {
+				fmt.Fprintln(os.Stderr, "vitrine:", err)
+				os.Exit(1)
+			}
+			return
+		}
 	}
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "vitrine:", err)
@@ -38,7 +51,7 @@ func main() {
 func run(args []string) error {
 	fset := flag.NewFlagSet("vitrine", flag.ContinueOnError)
 	fset.Usage = func() {
-		fmt.Fprintf(fset.Output(), "Usage: vitrine [flags]\n       vitrine version\n\nFlags (also settable as VITRINE_<NAME> environment variables):\n")
+		fmt.Fprintf(fset.Output(), "Usage: vitrine [flags]\n       vitrine passwd   print a password hash for the \"passhash\" option\n       vitrine version\n\nFlags (also settable as VITRINE_<NAME> environment variables):\n")
 		fset.PrintDefaults()
 	}
 	root := fset.String("root", env("ROOT", ""), "folder to share (required)")
@@ -112,6 +125,42 @@ func run(args []string) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return httpSrv.Shutdown(shutdownCtx)
+}
+
+// passwd reads a password (without echo on a terminal) and prints its
+// bcrypt hash for the "passhash" option.
+func passwd() error {
+	var pass string
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		fmt.Fprint(os.Stderr, "Password: ")
+		b, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return err
+		}
+		fmt.Fprint(os.Stderr, "Repeat: ")
+		again, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return err
+		}
+		if string(b) != string(again) {
+			return errors.New("passwords do not match")
+		}
+		pass = string(b)
+	} else {
+		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil && line == "" {
+			return err
+		}
+		pass = strings.TrimRight(line, "\r\n")
+	}
+	hash, err := auth.Hash(pass)
+	if err != nil {
+		return err
+	}
+	fmt.Println(hash)
+	return nil
 }
 
 func env(name, def string) string {
