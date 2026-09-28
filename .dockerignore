@@ -1,0 +1,12 @@
+.git
+.github
+/vitrine
+/bin
+/dist
+/cache
+/data
+/share
+/conf.local
+*.local.json
+.env
+.env.*
