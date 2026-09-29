@@ -94,6 +94,7 @@ jobs:
           ARCH_TAG=$(echo "${{ matrix.arch }}" | xargs basename | tr -d '[:space:]')
           echo "${ARCH_TAG}"
           echo "arch_tag=${ARCH_TAG}" >> "$GITHUB_OUTPUT"
+      # A tag belongs to no branch: tagged releases report the branch "release".
       # Each architecture is pushed by digest only, so no intermediate tags
       # exist that would have to be deleted later.
       - name: Build and Push Image (${{ matrix.arch }})
@@ -104,7 +105,7 @@ jobs:
           build-args: |
             VERSION=${{ needs.prepare.outputs.version }}
             REVISION=${{ github.sha }}
-            BRANCH=${{ github.ref_type == 'branch' && github.ref_name || '' }}
+            BRANCH=${{ github.ref_type == 'branch' && github.ref_name || 'release' }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
