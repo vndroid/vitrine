@@ -8,9 +8,8 @@ continuation of [h5ai](https://github.com/lrsjng/h5ai) by Lars Jung. It
 replaces the PHP backend, and the web server configuration it depended on,
 with a self-contained server that serves the files itself.
 
-> **Status:** the backend rewrite is complete and API-compatible with the
-> h5fs frontend, which is bundled unchanged for now (it still shows some
-> h5fs/PHP wording, e.g. on the info page). A rewritten frontend follows.
+> **Status:** early releases. The backend is a complete rewrite in Go; the
+> frontend is the h5fs frontend, maintained in [`frontend/`](frontend).
 
 ## Features
 
