@@ -9,7 +9,6 @@ import * as esbuild from 'esbuild';
 import less from 'less';
 import postcss from 'postcss';
 import autoprefixer from 'autoprefixer';
-import cssmin from 'cssmin';
 import includeit from './lib/include.js';
 import {ESLint} from 'eslint';
 import esx from 'eslint-plugin-es-x';
@@ -84,9 +83,10 @@ await write(path.join(OUT, 'js', 'scripts.js'), banner + scripts);
 // css
 for (const source of (await glob('css/*.less', {cwd: SRC, absolute: true})).sort()) {
     let css = includeit({file: source, content: await fs.readFile(source, 'utf8')});
-    css = (await less.render(css, {paths: [path.dirname(source)], filename: source, ieCompat: true})).css;
+    css = (await less.render(css, {paths: [path.dirname(source)], filename: source})).css;
     css = (await postcss([autoprefixer]).process(css, {from: source})).css;
-    await write(path.join(OUT, 'css', path.basename(source, '.less') + '.css'), banner + cssmin(css, -1));
+    const min = await esbuild.transform(css, {loader: 'css', minify: true});
+    await write(path.join(OUT, 'css', path.basename(source, '.less') + '.css'), banner + min.code);
 }
 
 // images and other static files

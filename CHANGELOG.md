@@ -4,6 +4,14 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.3.1 - 2026-09-29
+
+- frontend build: the unmaintained `cssmin` is replaced by esbuild's CSS
+  minifier, the obsolete LESS `ieCompat` option is gone
+- frontend dependencies updated (DOMPurify 3.4.16, kjua 0.10, lolight
+  1.4.1, jsdom 30, scar 2.3.4, eslint, autoprefixer); the pinned
+  versions became `^` ranges
+
 ## 0.3.0 - 2026-09-29
 
 Removes the compatibility with h5fs and other deprecated code:
