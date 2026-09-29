@@ -4,6 +4,11 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.1 - 2026-09-29
+
+- `vitrine -h` / `--help` prints all commands and flags, each with its
+  `VITRINE_*` environment variable and default, on the standard output
+
 ## 0.4.0 - 2026-09-29
 
 - the admin page moved from `/_vitrine/public/` to `/-/admin`; the old

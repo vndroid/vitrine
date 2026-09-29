@@ -41,10 +41,11 @@ Then open http://localhost:8080/.
 | `-access-log` | `VITRINE_ACCESS_LOG` | `false` | log every request (client, method, path, status, bytes, duration) |
 | `-log-format` | `VITRINE_LOG_FORMAT` | `text` | `text` or `json` |
 
-`vitrine validate -config <dir>` checks a config folder (exit code 1 on
-errors, `-strict` also on warnings), `vitrine passwd` prints a password
-hash for the admin login, `vitrine -v` (or `--version`) the version and
-build information:
+`vitrine -h` (or `--help`) lists all commands and flags with their
+environment variables. `vitrine validate -config <dir>` checks a config
+folder (exit code 1 on errors, `-strict` also on warnings), `vitrine
+passwd` prints a password hash for the admin login, `vitrine -v` (or
+`--version`) the version and build information:
 
 ```
 vitrine, version 0.2.1 (branch: main, revision: 74661efee79c35ce052924b00690e45d363e4913)

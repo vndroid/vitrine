@@ -34,6 +34,11 @@ func main() {
 		fmt.Print(currentBuild().format(colorEnabled(os.Stdout)))
 		return
 	}
+	if isHelpFlag(os.Args[1:]) {
+		fset, _ := newServerFlags()
+		printHelp(os.Stdout, fset)
+		return
+	}
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "validate":
@@ -52,21 +57,34 @@ func main() {
 	}
 }
 
-func run(args []string) error {
+// serverFlags are the options of "vitrine": the flags, also settable as
+// VITRINE_<NAME> environment variables.
+type serverFlags struct {
+	root, listen, confDir, cacheDir, basePath, logFormat, proxies *string
+	follow, accessLog                                             *bool
+}
+
+func newServerFlags() (*flag.FlagSet, *serverFlags) {
 	fset := flag.NewFlagSet("vitrine", flag.ContinueOnError)
-	fset.Usage = func() {
-		fmt.Fprintf(fset.Output(), "Usage: vitrine [flags]\n       vitrine validate [-config dir] [-strict]   check a config folder\n       vitrine passwd   print a password hash for the \"passhash\" option\n       vitrine -v, --version   print the version and build information\n\nFlags (also settable as VITRINE_<NAME> environment variables):\n")
-		fset.PrintDefaults()
+	f := &serverFlags{
+		root:      fset.String("root", env("ROOT", ""), "folder to share (required)"),
+		listen:    fset.String("listen", env("LISTEN", ":8080"), "address to listen on"),
+		confDir:   fset.String("config", env("CONFIG", ""), "config folder overriding the defaults (options.json, types.json, l10n/, ext/)"),
+		cacheDir:  fset.String("cache", env("CACHE", defaultCacheDir()), "cache folder for thumbnails"),
+		basePath:  fset.String("base-path", env("BASE_PATH", ""), "URL path vitrine is served below, e.g. /files (default: the site root)"),
+		follow:    fset.Bool("follow-symlinks", envBool("FOLLOW_SYMLINKS"), "also serve symbolic links whose target is outside -root (hidden rules still apply)"),
+		accessLog: fset.Bool("access-log", envBool("ACCESS_LOG"), "log every request (client, method, path, status, bytes, duration)"),
+		logFormat: fset.String("log-format", env("LOG_FORMAT", "text"), `log format, "text" or "json"`),
+		proxies:   fset.String("trusted-proxy", env("TRUSTED_PROXY", ""), "comma separated IPs/CIDRs of reverse proxies whose X-Real-IP, X-Forwarded-For and X-Forwarded-Proto headers are trusted"),
 	}
-	root := fset.String("root", env("ROOT", ""), "folder to share (required)")
-	listen := fset.String("listen", env("LISTEN", ":8080"), "address to listen on")
-	confDir := fset.String("config", env("CONFIG", ""), "config folder overriding the defaults (options.json, types.json, l10n/, ext/)")
-	cacheDir := fset.String("cache", env("CACHE", defaultCacheDir()), "cache folder for thumbnails")
-	basePath := fset.String("base-path", env("BASE_PATH", ""), "URL path vitrine is served below, e.g. /files (default: the site root)")
-	follow := fset.Bool("follow-symlinks", envBool("FOLLOW_SYMLINKS"), "also serve symbolic links whose target is outside -root (hidden rules still apply)")
-	accessLog := fset.Bool("access-log", envBool("ACCESS_LOG"), "log every request (client, method, path, status, bytes, duration)")
-	logFormat := fset.String("log-format", env("LOG_FORMAT", "text"), `log format, "text" or "json"`)
-	proxies := fset.String("trusted-proxy", env("TRUSTED_PROXY", ""), "comma separated IPs/CIDRs of reverse proxies whose X-Real-IP, X-Forwarded-For and X-Forwarded-Proto headers are trusted")
+	fset.Usage = func() { printHelp(fset.Output(), fset) }
+	return fset, f
+}
+
+func run(args []string) error {
+	fset, f := newServerFlags()
+	root, listen, confDir, cacheDir, basePath := f.root, f.listen, f.confDir, f.cacheDir, f.basePath
+	follow, accessLog, logFormat, proxies := f.follow, f.accessLog, f.logFormat, f.proxies
 	if err := fset.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
