@@ -14,15 +14,15 @@ in `cmd/vitrine/version.go`; releases are tagged by hand.
 
 ## 0.3.0 - 2026-09-29
 
-Removes the compatibility with h5fs and other deprecated code:
+Removes the compatibility with h5ai and other deprecated code:
 
-- `_h5fs.` custom header/footer files and the `^_h5fs` hidden pattern
+- `_h5ai.` custom header/footer files and the `^_h5ai` hidden pattern
 - `download.type` is `tar` or `zip` only (no `php-tar`, `shell-tar`,
   `shell-zip`)
 - thumbnails only use `ffmpeg` and ImageMagick 7 (`magick`); `avconv`,
   `convert` and GraphicsMagick (`gm`) are no longer detected or used
 - the API error code is spelled `ERR_ILLEGAL_PARAM`
-- the frontend no longer takes over preferences stored by h5fs
+- the frontend no longer takes over preferences stored by h5ai
 - thumbnail cache names use SHA-224 instead of SHA-1; files of older
   versions are cleaned up by the cache limit
 
@@ -120,17 +120,17 @@ Removes the compatibility with h5fs and other deprecated code:
 
 ## 0.1.0 - 2026-09-29
 
-First release: a Go rewrite of the h5fs backend, serving the h5fs frontend.
+First release: a Go rewrite of the h5ai backend, serving the h5ai frontend.
 
 - single binary serving the frontend, the shared files (with HTTP Range)
-  and the h5fs compatible API; Docker image with ffmpeg and ImageMagick
+  and the h5ai compatible API; Docker image with ffmpeg and ImageMagick
 - listing, search, custom header/footer, 35 languages, info page
-- packaged tar/zip downloads built natively, with the h5fs limits
+- packaged tar/zip downloads built natively, with the h5ai limits
 - thumbnails for images (EXIF orientation aware), videos and PDFs, with
   a size limited cache; `thumbnails.exif` uses embedded EXIF thumbnails
   that are large enough and not letterboxed
-- admin login compatible with h5fs password hashes, `vitrine passwd`
-- configuration compatible with h5fs, merged over the defaults and
+- admin login compatible with h5ai password hashes, `vitrine passwd`
+- configuration compatible with h5ai, merged over the defaults and
   reloaded while running (every 2 seconds and on SIGHUP)
 - `-base-path` to serve below a path of a site
 - `-follow-symlinks` to serve links leaving the shared folder

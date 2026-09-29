@@ -3,20 +3,16 @@
 A modern HTML5 directory index for sharing files over the web, shipped as a
 single Go binary.
 
-vitrine is a rewrite of [h5fs](https://github.com/vndroid/h5fs), itself a
-continuation of [h5ai](https://github.com/lrsjng/h5ai) by Lars Jung. It
+Vitrine is a rewrite of [h5ai](https://github.com/lrsjng/h5ai) by Lars Jung. It
 replaces the PHP backend, and the web server configuration it depended on,
 with a self-contained server that serves the files itself.
 
-> **Status:** early releases. The backend is a complete rewrite in Go; the
-> frontend is the h5fs frontend, maintained in [`frontend/`](frontend).
-
 ## Features
 
-- browse folders in details, grid and icon views, with tree, breadcrumb,
+- browse folders in details, grid and icon views, with a tree, breadcrumb,
   sorting, filter and search
 - previews for images, audio, video (streamed with HTTP Range), text,
-  markdown and source code
+  Markdown and source code
 - thumbnails for images (JPEG, PNG, GIF, BMP, WebP; AVIF and HEIC with
   ImageMagick; EXIF orientation aware), videos (ffmpeg) and PDF/PostScript
   (ImageMagick), cached with a size limit
@@ -34,7 +30,7 @@ vitrine -root /srv/share
 Then open http://localhost:8080/.
 
 | Flag | Environment | Default | |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `-root` | `VITRINE_ROOT` | | folder to share (required) |
 | `-listen` | `VITRINE_LISTEN` | `:8080` | listen address |
 | `-config` | `VITRINE_CONFIG` | | config folder, see below |
@@ -81,7 +77,7 @@ read-only.
 
 Without `-config` the built-in defaults are used (see
 [`web/conf/options.json`](web/conf/options.json), all options are
-documented there). A config folder may contain:
+documented there). The config folder may contain:
 
 - `options.json`: merged over the defaults, so it only needs the options
   you change, e.g.
@@ -117,7 +113,7 @@ stays active.
 
 ### Behind a reverse proxy
 
-vitrine only trusts `X-Real-IP`, `X-Forwarded-For` and `X-Forwarded-Proto`
+Vitrine only trusts `X-Real-IP`, `X-Forwarded-For` and `X-Forwarded-Proto`
 from the addresses given with `-trusted-proxy`. Set it to the address the
 proxy connects from, so login throttling and download limits see the real
 clients and session cookies get the `Secure` flag behind TLS:
@@ -142,7 +138,7 @@ location / {
 Don't compress video and other binary responses in the proxy, it breaks
 Range requests.
 
-To serve vitrine below a path of an existing site, start it with
+To serve the vitrine below a path of an existing site, start it with
 `-base-path /files` and pass the path on unchanged:
 
 ```nginx
@@ -166,7 +162,7 @@ files.example.com {
 }
 ```
 
-Caddy obtains the TLS certificate and sets `X-Forwarded-Proto`. `encode`
+Caddy gets the TLS certificate and sets `X-Forwarded-Proto`. `encode`
 may be used: Caddy only compresses text responses, so Range requests for
 media keep working.
 
@@ -206,5 +202,4 @@ npm run build   # writes ../web/public
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The bundled frontend and icons come from h5fs /
-h5ai (MIT); some Material Design icons are licensed under CC BY 4.0.
+MIT, see [LICENSE](LICENSE). The bundled frontend and icons come from h5ai (MIT); some Material Design icons are licensed under CC BY 4.0.
