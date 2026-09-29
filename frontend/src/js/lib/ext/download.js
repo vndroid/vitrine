@@ -9,7 +9,7 @@ const {each, dom} = util;
 
 const settings = Object.assign({
     enabled: false,
-    type: 'php-tar',
+    type: 'tar',
     packageName: 'package',
     alwaysVisible: false
 }, allsettings.download);
@@ -33,7 +33,8 @@ const onSelection = items => {
 const onClick = () => {
     const type = settings.type;
     let name = settings.packageName;
-    const extension = type === 'shell-zip' ? 'zip' : 'tar';
+    // "shell-zip" is the former name of "zip"
+    const extension = type === 'zip' || type === 'shell-zip' ? 'zip' : 'tar';
 
     if (!name) {
         if (selectedItems.length === 1) {

@@ -133,8 +133,8 @@
     Enable packaged download of selected entries.
     To select files the "select"-extension needs to be enabled.
 
-    - type: string, "php-tar" or "shell-tar" for a tar, "shell-zip" for a zip package
-        (names kept for compatibility, all packages are built by vitrine itself)
+    - type: string, "tar" or "zip" (the h5fs names "php-tar", "shell-tar"
+        and "shell-zip" are still accepted)
     - packageName: string, basename of the download package, null for current filename or foldername
     - alwaysVisible: boolean, always show download button (defaults to download the current folder)
     - maxConcurrent: number, max number of downloads running at the same time
@@ -147,7 +147,7 @@
     */
     "download": {
         "enabled": true,
-        "type": "php-tar",
+        "type": "tar",
         "packageName": null,
         "alwaysVisible": false,
         "maxConcurrent": 4,
@@ -180,15 +180,15 @@
     /*
     Calc the size of folders.
     This operation is real slow. The calculated sizes differ slightly for both
-    calculation types since "php" only adds the file sizes, while "shell-du"
+    calculation types since "sum" only adds the file sizes, while "shell-du"
     also adds the sizes for the actual folder files.
 
-    - type: string, "php" (sums up file sizes, name kept for compatibility)
+    - type: string, "sum" (sums up file sizes, "php" is the former name)
         or "shell-du" (runs "du", needs it to be installed)
     */
     "foldersize": {
         "enabled": true,
-        "type": "php"
+        "type": "sum"
     },
 
     /*

@@ -1,7 +1,8 @@
 const run = async () => {
     if (!global.window) {
         const {JSDOM} = await import('jsdom');
-        global.window = new JSDOM('').window;
+        // a real origin, so localStorage is available
+        global.window = new JSDOM('', {url: 'http://localhost/'}).window;
     }
 
     const {default: scar} = await import('scar');
@@ -10,6 +11,7 @@ const run = async () => {
     await import('./tests/premisses.js');
     await import('./tests/unit/core/event.js');
     await import('./tests/unit/core/format.js');
+    await import('./tests/unit/core/store.js');
     await import('./tests/unit/util/naturalCmp.js');
     await import('./tests/unit/util/parsePatten.js');
     await import('./tests/unit/util/sanitizeHtml.js');

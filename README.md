@@ -125,8 +125,12 @@ Range requests.
 - Changes in behavior:
   - hidden entries are no longer downloadable by direct URL;
   - symbolic links leaving the root are neither listed nor served;
-  - the `download.type` values `php-tar`, `shell-tar` and `shell-zip` are
-    all built by vitrine, no `tar`/`zip` commands are needed;
+  - packages are built by vitrine, no `tar`/`zip` commands are needed;
+    `download.type` is now `tar` or `zip`, the h5fs values `php-tar`,
+    `shell-tar` and `shell-zip` still work (as does `foldersize.type`
+    `php`, now called `sum`);
+  - view preferences stored by h5fs in the browser are taken over when
+    vitrine runs on the same origin;
   - thumbnails respect the EXIF orientation of photos;
   - the thumbnail option `thumbnails.exif` (embedded EXIF thumbnails) is
     ignored.

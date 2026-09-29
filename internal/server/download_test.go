@@ -100,3 +100,13 @@ func TestPackageName(t *testing.T) {
 		t.Errorf("contentDisposition = %s", cd)
 	}
 }
+
+func TestDownloadTypeNames(t *testing.T) {
+	s, _ := newTestServer(t, fixtureOpts{})
+	for typ, ext := range map[string]string{"tar": ".tar", "php-tar": ".tar", "shell-tar": ".tar", "zip": ".zip", "shell-zip": ".zip"} {
+		rec := formDownload(s, "action=download&as=p&type="+typ+"&baseHref=%2Fsub%2F&hrefs=")
+		if !strings.Contains(rec.Header().Get("Content-Disposition"), `filename="p`+ext+`"`) {
+			t.Errorf("type %s: %s %s", typ, rec.Header().Get("Content-Disposition"), rec.Body.String())
+		}
+	}
+}
