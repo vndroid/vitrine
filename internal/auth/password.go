@@ -40,6 +40,12 @@ func LoginEnabled(hash string) bool {
 	return isBcrypt(hash) || argon2Re.MatchString(hash) || sha512HexRe.MatchString(hash)
 }
 
+// IsEmptyPasswordHash reports whether hash is the SHA512 of the empty
+// password, the former h5fs preset that disables the login.
+func IsEmptyPasswordHash(hash string) bool {
+	return strings.EqualFold(strings.TrimSpace(hash), emptySHA512)
+}
+
 func isBcrypt(hash string) bool {
 	_, err := bcrypt.Cost([]byte(hash))
 	return err == nil

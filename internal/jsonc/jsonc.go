@@ -2,7 +2,16 @@
 // the h5fs configuration files.
 package jsonc
 
-// Strip removes comments from commented JSON. It follows the h5fs
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"unicode/utf8"
+)
+
+// Strip blanks out the comments of commented JSON: comment characters
+// become spaces and line breaks are kept, so byte offsets, lines and
+// columns of the result are those of the source. It follows the h5fs
 // implementation, so config files are read exactly as before: a quote
 // preceded by a backslash does not toggle the string state.
 func Strip(src []byte) []byte {
@@ -11,9 +20,15 @@ func Strip(src []byte) []byte {
 		single
 		multi
 	)
-	out := make([]byte, 0, len(src))
+	out := make([]byte, len(src))
+	copy(out, src)
 	inString := false
 	comment := none
+	blank := func(i int) {
+		if out[i] != '\n' && out[i] != '\r' {
+			out[i] = ' '
+		}
+	}
 
 	for i := 0; i < len(src); i++ {
 		c := src[i]
@@ -32,26 +47,69 @@ func Strip(src []byte) []byte {
 
 		switch {
 		case inString:
-			out = append(out, c)
 		case comment == none && c == '/' && next == '/':
 			comment = single
+			blank(i)
+			blank(i + 1)
 			i++
 		case comment == none && c == '/' && next == '*':
 			comment = multi
+			blank(i)
+			blank(i + 1)
 			i++
 		case comment == none:
-			out = append(out, c)
-		case comment == single && c == '\r' && next == '\n':
+		case comment == single && (c == '\n' || c == '\r'):
 			comment = none
-			out = append(out, c, next)
-			i++
-		case comment == single && c == '\n':
-			comment = none
-			out = append(out, c)
 		case comment == multi && c == '*' && next == '/':
 			comment = none
+			blank(i)
+			blank(i + 1)
 			i++
+		default:
+			blank(i)
 		}
 	}
 	return out
+}
+
+// Position returns the 1-based line and column (in characters) of a byte
+// offset.
+func Position(src []byte, offset int64) (line, col int) {
+	if offset > int64(len(src)) {
+		offset = int64(len(src))
+	}
+	line, col = 1, 1
+	for _, r := range string(src[:offset]) {
+		if r == '\n' {
+			line++
+			col = 1
+		} else {
+			col++
+		}
+	}
+	return line, col
+}
+
+// ErrorAt describes a JSON decoding error with the line and column in src,
+// if the error carries an offset.
+func ErrorAt(src []byte, err error) error {
+	var syntax *json.SyntaxError
+	var typ *json.UnmarshalTypeError
+	var offset int64 = -1
+	switch {
+	case errors.As(err, &syntax):
+		offset = syntax.Offset
+	case errors.As(err, &typ):
+		offset = typ.Offset
+	}
+	if offset < 0 {
+		return err
+	}
+	// the offset points behind the offending character
+	if offset > 0 {
+		_, size := utf8.DecodeLastRune(src[:min(offset, int64(len(src)))])
+		offset -= int64(size)
+	}
+	line, col := Position(src, offset)
+	return fmt.Errorf("line %d, column %d: %w", line, col, err)
 }

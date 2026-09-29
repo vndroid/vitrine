@@ -4,6 +4,17 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.2.0 - 2026-09-29
+
+- `vitrine validate [-config dir] [-strict]` checks a config folder:
+  syntax (with line and column), unknown options with suggestions,
+  types, allowed values and ranges, hidden patterns, the password hash
+  and references to themes, languages and file types
+- the same checks are logged at start and after every config reload;
+  config load errors report line and column
+- file types for README, LICENSE, AUTHORS, INSTALL and Makefile, whose
+  text preview styles were configured but never matched
+
 ## 0.1.10 - 2026-09-29
 
 - info page: show the Go runtime and the platform as separate checks

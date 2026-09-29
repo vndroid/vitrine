@@ -21,6 +21,7 @@ import (
 	"github.com/vndroid/vitrine/internal/config"
 	"github.com/vndroid/vitrine/internal/server"
 	"github.com/vndroid/vitrine/internal/tree"
+	"github.com/vndroid/vitrine/internal/validate"
 	"github.com/vndroid/vitrine/web"
 	"golang.org/x/term"
 )
@@ -37,6 +38,8 @@ func main() {
 		case "version":
 			fmt.Println(buildVersion())
 			return
+		case "validate":
+			os.Exit(validateCmd(os.Args[2:]))
 		case "passwd":
 			if err := passwd(); err != nil {
 				fmt.Fprintln(os.Stderr, "vitrine:", err)
@@ -54,7 +57,7 @@ func main() {
 func run(args []string) error {
 	fset := flag.NewFlagSet("vitrine", flag.ContinueOnError)
 	fset.Usage = func() {
-		fmt.Fprintf(fset.Output(), "Usage: vitrine [flags]\n       vitrine passwd   print a password hash for the \"passhash\" option\n       vitrine version\n\nFlags (also settable as VITRINE_<NAME> environment variables):\n")
+		fmt.Fprintf(fset.Output(), "Usage: vitrine [flags]\n       vitrine validate [-config dir] [-strict]   check a config folder\n       vitrine passwd   print a password hash for the \"passhash\" option\n       vitrine version\n\nFlags (also settable as VITRINE_<NAME> environment variables):\n")
 		fset.PrintDefaults()
 	}
 	root := fset.String("root", env("ROOT", ""), "folder to share (required)")
@@ -90,6 +93,9 @@ func run(args []string) error {
 
 	cfg, err := config.Load(*confDir, web.Conf())
 	if err != nil {
+		for _, iss := range validate.Config(validateOptions(*confDir)) {
+			fmt.Fprintln(os.Stderr, iss)
+		}
 		return fmt.Errorf("config: %w", err)
 	}
 	trusted, err := server.ParseTrustedProxies(*proxies)
@@ -141,7 +147,9 @@ func run(args []string) error {
 
 	// like h5fs, config changes apply without a restart: the config folder
 	// is checked every few seconds, SIGHUP reloads immediately
-	go cfg.Watch(ctx, configWatchInterval, log)
+	checkConfig := func() { logIssues(log, *confDir) }
+	checkConfig()
+	go cfg.Watch(ctx, configWatchInterval, log, checkConfig)
 	hup := make(chan os.Signal, 1)
 	signal.Notify(hup, syscall.SIGHUP)
 	go func() {
@@ -150,6 +158,7 @@ func run(args []string) error {
 				log.Error("config reload failed, keeping the current config", "err", err)
 			} else {
 				log.Info("config reloaded (SIGHUP)")
+				checkConfig()
 			}
 		}
 	}()

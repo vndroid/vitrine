@@ -45,7 +45,9 @@ Then open http://localhost:8080/.
 | `-access-log` | `VITRINE_ACCESS_LOG` | `false` | log every request (client, method, path, status, bytes, duration) |
 | `-log-format` | `VITRINE_LOG_FORMAT` | `text` | `text` or `json` |
 
-`vitrine passwd` prints a password hash for the admin login,
+`vitrine validate -config <dir>` checks a config folder (exit code 1 on
+errors, `-strict` also on warnings), `vitrine passwd` prints a password
+hash for the admin login,
 `vitrine version` the version.
 
 ### Docker

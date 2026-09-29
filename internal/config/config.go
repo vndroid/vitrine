@@ -137,8 +137,7 @@ func (c *Config) load() (*snapshot, error) {
 	for _, p := range stringList(s, "view.hidden") {
 		re, err := pattern.Compile(p, false)
 		if err != nil {
-			slog.Warn("ignoring unsupported view.hidden pattern", "pattern", p, "err", err)
-			continue
+			continue // reported by the config validation
 		}
 		s.hidden = append(s.hidden, re)
 	}
@@ -150,8 +149,9 @@ func (c *Config) load() (*snapshot, error) {
 }
 
 // Watch reloads the configuration whenever the files of the config
-// directory change, checking every interval until ctx is done.
-func (c *Config) Watch(ctx context.Context, interval time.Duration, log *slog.Logger) {
+// directory change, checking every interval until ctx is done. afterReload
+// (may be nil) runs after every successful reload.
+func (c *Config) Watch(ctx context.Context, interval time.Duration, log *slog.Logger, afterReload func()) {
 	if c.dir == "" {
 		return
 	}
@@ -173,6 +173,9 @@ func (c *Config) Watch(ctx context.Context, interval time.Duration, log *slog.Lo
 			log.Error("config reload failed, keeping the current config", "err", err)
 		} else {
 			log.Info("config reloaded", "dir", c.dir)
+			if afterReload != nil {
+				afterReload()
+			}
 		}
 	}
 }
@@ -377,7 +380,10 @@ func truthy(v any) bool {
 func decode(raw []byte, v any) error {
 	dec := json.NewDecoder(bytes.NewReader(jsonc.Strip(raw)))
 	dec.UseNumber()
-	return dec.Decode(v)
+	if err := dec.Decode(v); err != nil {
+		return jsonc.ErrorAt(raw, err)
+	}
+	return nil
 }
 
 // loadTypes keeps types.json in its original key order: both the client
@@ -396,7 +402,7 @@ func loadTypes(src layered) (json.RawMessage, []typeRE, error) {
 	for dec.More() {
 		tok, err := dec.Token()
 		if err != nil {
-			return nil, nil, fmt.Errorf("types.json: %w", err)
+			return nil, nil, fmt.Errorf("types.json: %w", jsonc.ErrorAt(raw, err))
 		}
 		name, _ := tok.(string)
 		var globs []any
@@ -416,7 +422,7 @@ func loadTypes(src layered) (json.RawMessage, []typeRE, error) {
 	}
 	var check any
 	if err := json.Unmarshal(stripped, &check); err != nil {
-		return nil, nil, fmt.Errorf("types.json: %w", err)
+		return nil, nil, fmt.Errorf("types.json: %w", jsonc.ErrorAt(raw, err))
 	}
 	return json.RawMessage(stripped), res, nil
 }

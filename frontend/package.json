@@ -1,6 +1,6 @@
 {
   "name": "vitrine-frontend",
-  "version": "0.1.10",
+  "version": "0.2.0",
   "private": true,
   "description": "Frontend of vitrine (continued from the h5fs/h5ai frontend).",
   "homepage": "https://github.com/vndroid/vitrine",

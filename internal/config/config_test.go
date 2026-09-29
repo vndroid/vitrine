@@ -220,7 +220,7 @@ func TestWatch(t *testing.T) {
 	c, _ := Load(dir, web.Conf())
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go c.Watch(ctx, 10*time.Millisecond, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	go c.Watch(ctx, 10*time.Millisecond, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
 
 	time.Sleep(30 * time.Millisecond)
 	os.WriteFile(opts, []byte(`{"title": {"enabled": true}}`), 0o600)
