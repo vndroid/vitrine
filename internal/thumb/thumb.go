@@ -358,6 +358,58 @@ func (s *Service) maxBytes() int64 {
 	return int64(mb) << 20
 }
 
+// maxAge is the time after which an unused thumbnail is removed
+// ("thumbnails.maxCacheTime" days), 0 if thumbnails do not expire.
+func (s *Service) maxAge() time.Duration {
+	if days, ok := s.cfg.PositiveInt("thumbnails.maxCacheTime"); ok {
+		return time.Duration(days) * 24 * time.Hour
+	}
+	return 0
+}
+
+// Expire removes the thumbnails that were not used for "thumbnails.maxCacheTime"
+// days and returns how many. The modification time of a file is refreshed
+// when it is used (at most once a day), so it is the time of the last use.
+// Nothing is removed if the option is not set.
+func (s *Service) Expire(now time.Time) int {
+	age := s.maxAge()
+	if age == 0 {
+		return 0
+	}
+	s.usageMu.Lock()
+	defer s.usageMu.Unlock()
+	s.loadUsage()
+	cutoff := now.Add(-age)
+	removed := 0
+	for _, f := range s.cacheFiles() {
+		if f.mtime.Before(cutoff) && os.Remove(f.path) == nil {
+			s.usage = max(0, s.usage-f.size)
+			removed++
+		}
+	}
+	if removed > 0 {
+		s.log.Info("expired thumbnails removed", "count", removed)
+	}
+	return removed
+}
+
+// RunExpiry removes the expired thumbnails now and then every interval,
+// until ctx ends. The option is read on every run, so changes of the
+// configuration apply without a restart.
+func (s *Service) RunExpiry(ctx context.Context, interval time.Duration) {
+	s.Expire(time.Now())
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-t.C:
+			s.Expire(now)
+		}
+	}
+}
+
 // reserve reports whether a new cache file may be written, cleaning up
 // the least recently used files once the cache is full.
 func (s *Service) reserve() bool {

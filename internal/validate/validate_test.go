@@ -167,3 +167,18 @@ func TestSuggest(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxCacheTime(t *testing.T) {
+	for options, want := range map[string]string{
+		`{"thumbnails": {"maxCacheTime": 30}}`:  "",
+		`{"thumbnails": {"maxCacheTime": 0}}`:   "",
+		`{"thumbnails": {"maxCacheTime": -1}}`:  "error: thumbnails.maxCacheTime: -1 is less than 0",
+		`{"thumbnails": {"maxCacheTime": 1.5}}`: "error: thumbnails.maxCacheTime: expected a whole number, got 1.5",
+		`{"thumbnails": {"maxCacheTime": "7"}}`: "thumbnails.maxCacheTime",
+	} {
+		got := short(check(t, map[string]string{"options.json": options}))
+		if want == "" && got != "" || want != "" && !strings.Contains(got, want) {
+			t.Errorf("%s:\n got %q\nwant %q", options, got, want)
+		}
+	}
+}

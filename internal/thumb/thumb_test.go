@@ -2,6 +2,7 @@ package thumb
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/binary"
 	"image"
@@ -506,5 +507,121 @@ func TestRenderQueueBound(t *testing.T) {
 	<-s.sem
 	if _, ok := s.Thumb("img", "/a.png", 240, 240); !ok {
 		t.Error("thumb after the queue drained")
+	}
+}
+
+// fakeCache returns the path of a fake cache file, aged as given.
+func fakeCache(t *testing.T, s *Service, letter string, size int, age time.Duration) string {
+	t.Helper()
+	p := filepath.Join(s.dir, "thumb-"+strings.Repeat(letter, 40)+"-240x240.jpg")
+	writeFile(t, p, make([]byte, size))
+	when := time.Now().Add(-age)
+	os.Chtimes(p, when, when)
+	return p
+}
+
+func TestExpire(t *testing.T) {
+	s, _ := service(t, `{"thumbnails": {"maxCacheTime": 7}}`)
+	old := fakeCache(t, s, "a", 1000, 8*24*time.Hour)
+	older := fakeCache(t, s, "b", 500, 30*24*time.Hour)
+	recent := fakeCache(t, s, "c", 2000, 6*24*time.Hour)
+	capture := filepath.Join(s.dir, "capture-"+strings.Repeat("d", 40)+".jpg")
+	writeFile(t, capture, []byte("frame"))
+	os.Chtimes(capture, time.Now().Add(-40*24*time.Hour), time.Now().Add(-40*24*time.Hour))
+	foreign := filepath.Join(s.dir, "notes.txt")
+	writeFile(t, foreign, []byte("not a thumbnail"))
+	os.Chtimes(foreign, time.Now().Add(-90*24*time.Hour), time.Now().Add(-90*24*time.Hour))
+
+	// the usage is known before, like after the first request
+	s.usageMu.Lock()
+	s.loadUsage()
+	before := s.usage
+	s.usageMu.Unlock()
+
+	if n := s.Expire(time.Now()); n != 3 {
+		t.Errorf("Expire removed %d files, want 3", n)
+	}
+	for _, p := range []string{old, older, capture} {
+		if _, err := os.Stat(p); err == nil {
+			t.Errorf("%s should have expired", filepath.Base(p))
+		}
+	}
+	for _, p := range []string{recent, foreign} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("%s must stay: %v", filepath.Base(p), err)
+		}
+	}
+	s.usageMu.Lock()
+	after := s.usage
+	s.usageMu.Unlock()
+	if want := before - 1000 - 500 - int64(len("frame")); after != want {
+		t.Errorf("usage = %d, want %d", after, want)
+	}
+	// the time is the one of the given "now"
+	if n := s.Expire(time.Now().Add(2 * 24 * time.Hour)); n != 1 {
+		t.Errorf("2 days later Expire removed %d files, want 1", n)
+	}
+}
+
+func TestExpireIsOffByDefault(t *testing.T) {
+	for _, options := range []string{"", `{"thumbnails": {"maxCacheTime": 0}}`} {
+		s, _ := service(t, options)
+		p := fakeCache(t, s, "a", 100, 3650*24*time.Hour)
+		if n := s.Expire(time.Now()); n != 0 {
+			t.Errorf("options %q: Expire removed %d files", options, n)
+		}
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("options %q: a thumbnail expired: %v", options, err)
+		}
+	}
+}
+
+// Thumbnails that are used are renewed, so they do not expire.
+func TestUsedThumbnailsDoNotExpire(t *testing.T) {
+	s, _ := service(t, `{"thumbnails": {"size": 240, "maxCacheTime": 7}}`)
+	name, ok := s.Thumb("img", "/a.png", 240, 240)
+	if !ok {
+		t.Fatal("thumbnail failed")
+	}
+	p, _ := s.Path(name)
+	// created 10 days ago, but used now: the request renews it
+	when := time.Now().Add(-10 * 24 * time.Hour)
+	os.Chtimes(p, when, when)
+	if _, ok := s.Thumb("img", "/a.png", 240, 240); !ok {
+		t.Fatal("second request failed")
+	}
+	if n := s.Expire(time.Now()); n != 0 {
+		t.Errorf("a used thumbnail expired (%d removed)", n)
+	}
+	if _, err := os.Stat(p); err != nil {
+		t.Errorf("thumbnail gone: %v", err)
+	}
+}
+
+func TestRunExpiry(t *testing.T) {
+	s, _ := service(t, `{"thumbnails": {"maxCacheTime": 1}}`)
+	first := fakeCache(t, s, "a", 100, 5*24*time.Hour)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { s.RunExpiry(ctx, 20*time.Millisecond); close(done) }()
+
+	waitGone := func(p string) {
+		t.Helper()
+		for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+			if _, err := os.Stat(p); err != nil {
+				return
+			}
+		}
+		t.Errorf("%s did not expire", filepath.Base(p))
+	}
+	waitGone(first) // the run at the start
+	second := fakeCache(t, s, "b", 100, 5*24*time.Hour)
+	waitGone(second) // a later run
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Error("RunExpiry did not stop with the context")
 	}
 }

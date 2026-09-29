@@ -4,6 +4,15 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.5 - 2026-09-29
+
+- `thumbnails.maxCacheTime`: days after which a thumbnail that was not used
+  is removed from the cache, 0 (the default) keeps thumbnails until the
+  cache is full (`thumbnails.maxCacheSize`, least recently used first).
+  Expired thumbnails are removed when vitrine starts and every hour, the
+  option applies without a restart. Using a thumbnail renews it (at most
+  once a day)
+
 ## 0.4.4 - 2026-09-29
 
 - every response carries `X-Powered-By: vitrine/<version>`, following the

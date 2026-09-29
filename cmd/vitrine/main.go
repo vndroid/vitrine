@@ -166,6 +166,7 @@ func run(args []string) error {
 	checkConfig := func() { logIssues(log, *confDir) }
 	checkConfig()
 	go cfg.Watch(ctx, configWatchInterval, log, checkConfig)
+	go srv.RunThumbExpiry(ctx)
 	hup := make(chan os.Signal, 1)
 	signal.Notify(hup, syscall.SIGHUP)
 	go func() {

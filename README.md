@@ -15,7 +15,8 @@ with a self-contained server that serves the files itself.
   Markdown and source code
 - thumbnails for images (JPEG, PNG, GIF, BMP, WebP; AVIF and HEIC with
   ImageMagick; EXIF orientation aware), videos (ffmpeg) and PDF/PostScript
-  (ImageMagick), cached with a size limit
+  (ImageMagick), cached with a size limit (`thumbnails.maxCacheSize`) and,
+  if wanted, removed after some days without use (`thumbnails.maxCacheTime`)
 - packaged downloads as tar or zip, streamed with limits
 - custom header and footer per folder, 35 languages, QR codes
 - admin page at `/-/admin` with login (bcrypt, rate limited)

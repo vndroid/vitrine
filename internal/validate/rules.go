@@ -32,6 +32,7 @@ var rules = map[string]rule{
 	"l10n.lang":                       language,
 	"thumbnails.size":                 intRange(1, 4096),
 	"thumbnails.maxCacheSize":         intRange(1, -1),
+	"thumbnails.maxCacheTime":         intRange(0, -1),
 	"thumbnails.delay":                intRange(0, -1),
 	// the server answers at most 40 thumbnails per request
 	"thumbnails.chunksize": intRange(1, 40),

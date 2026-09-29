@@ -392,6 +392,11 @@
     - chunksize: int, number of thumbs per request
     - maxCacheSize: number, max disk usage of the thumbnail cache in MiB,
         least recently used thumbnails are removed when it is exceeded
+    - maxCacheTime: number, days after which a thumbnail that was not used is
+        removed, 0 to keep thumbnails until the cache is full. Using a
+        thumbnail renews it (once a day), so a small value like 1 also
+        removes thumbnails that are used every day, they are created again
+        on demand. Checked when vitrine starts and every hour
     */
     "thumbnails": {
         "enabled": true,
@@ -402,7 +407,8 @@
         "size": 240,
         "exif": false,
         "chunksize": 20,
-        "maxCacheSize": 512
+        "maxCacheSize": 512,
+        "maxCacheTime": 0
     },
 
     /*

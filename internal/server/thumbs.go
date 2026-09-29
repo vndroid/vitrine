@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -103,4 +104,16 @@ func (s *Server) serveThumb(w http.ResponseWriter, r *http.Request, name string)
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "max-age=300")
 	http.ServeContent(w, r, name, fi.ModTime(), f)
+}
+
+// expiryInterval is how often thumbnails that are not used anymore are
+// looked for.
+const expiryInterval = time.Hour
+
+// RunThumbExpiry removes the thumbnails that were not used for
+// "thumbnails.maxCacheTime" days, when the option is set, until ctx ends.
+func (s *Server) RunThumbExpiry(ctx context.Context) {
+	if s.thumb != nil {
+		s.thumb.RunExpiry(ctx, expiryInterval)
+	}
 }
