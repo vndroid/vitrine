@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"syscall"
@@ -29,7 +28,7 @@ import (
 // configWatchInterval is how often the config folder is checked.
 const configWatchInterval = 2 * time.Second
 
-// version is set at build time with -ldflags "-X main.version=...".
+// version overrides Version at build time: -ldflags "-X main.version=...".
 var version = ""
 
 func main() {
@@ -226,21 +225,10 @@ func defaultCacheDir() string {
 	return filepath.Join(dir, "vitrine")
 }
 
-// buildVersion returns the version without the "v" of the git tag, e.g.
-// "0.1.0"; untagged builds report a pseudo version or commit.
+// buildVersion returns the version, without the "v" of a git tag.
 func buildVersion() string {
 	if version != "" {
 		return strings.TrimPrefix(version, "v")
 	}
-	if info, ok := debug.ReadBuildInfo(); ok {
-		if info.Main.Version != "" && info.Main.Version != "(devel)" {
-			return strings.TrimPrefix(info.Main.Version, "v")
-		}
-		for _, s := range info.Settings {
-			if s.Key == "vcs.revision" && len(s.Value) >= 7 {
-				return "dev-" + s.Value[:7]
-			}
-		}
-	}
-	return "dev"
+	return Version
 }

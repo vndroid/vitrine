@@ -1,7 +1,8 @@
 # Changelog
 
 Versions follow `major.minor.patch`: small features and fixes raise the
-patch version, larger feature changes the minor version.
+patch version, larger feature changes the minor version. The version lives
+in `cmd/vitrine/version.go`; releases are tagged by hand.
 
 ## 0.1.10 - 2026-09-29
 
