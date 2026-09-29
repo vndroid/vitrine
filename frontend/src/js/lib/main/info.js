@@ -20,9 +20,9 @@ const loginTpl =
             <span id="logout">logout</span>
             <div id="hint">
                 The login is disabled until a password is set:
-                put a hash generated with
-                <code>php -r 'echo password_hash("your-password", PASSWORD_DEFAULT);'</code>
-                into "passhash" in '_h5fs/private/conf/options.json'.
+                put a hash generated with <code>vitrine passwd</code>
+                into "passhash" in the <code>options.json</code> of the
+                config folder (<code>--config</code>).
             </div>
         </div>`;
 const setup = config.setup;
@@ -45,13 +45,13 @@ const addTests = () => {
     dom(testsTpl).appTo('#content');
 
     addTest(
-        'h5fs version', 'Only green if this is an official h5fs release',
+        'vitrine version', 'Only green if this is an official vitrine release',
         (/^\d+\.\d+\.\d+$/).test(setup.VERSION), setup.VERSION
     );
 
     addTest(
-        'Index file found', 'Add <code>' + setup.INDEX_HREF + '</code> to your index file list',
-        setup.INDEX_HREF
+        'Runtime', 'Go runtime and platform',
+        true, setup.GO_VERSION + ' ' + setup.PLATFORM
     );
 
     addTest(
@@ -65,62 +65,22 @@ const addTests = () => {
     );
 
     addTest(
-        'Server software', 'Server is one of apache, lighttpd, nginx or cherokee',
-        setup.HAS_SERVER, setup.SERVER_NAME + ' ' + setup.SERVER_VERSION
+        'Cache directory', 'vitrine has write access to the <code>--cache</code> folder (thumbnails)',
+        setup.HAS_WRITABLE_CACHE
     );
 
     addTest(
-        'PHP version', 'PHP version &gt;= ' + setup.MIN_PHP_VERSION,
-        true, setup.PHP_VERSION
+        'Movie thumbs', 'Command line program <code>ffmpeg</code> or <code>avconv</code> available',
+        setup.HAS_CMD_FFMPEG || setup.HAS_CMD_AVCONV
     );
 
     addTest(
-        'PHP arch', '64-bit required to correctly display file/folder sizes &gt; ~2GB',
-        setup.PHP_ARCH === '64-bit', setup.PHP_ARCH
+        'PDF thumbs', 'ImageMagick (<code>magick</code>, <code>convert</code>) or GraphicsMagick (<code>gm</code>) available',
+        setup.HAS_CMD_MAGICK || setup.HAS_CMD_CONVERT || setup.HAS_CMD_GM
     );
 
     addTest(
-        'Public Cache directory', 'Web server has write access',
-        setup.HAS_WRITABLE_CACHE_PUB
-    );
-
-    addTest(
-        'Private Cache directory', 'Web server has write access',
-        setup.HAS_WRITABLE_CACHE_PRV
-    );
-
-    addTest(
-        'Image thumbs', 'PHP GD extension with JPEG support available',
-        setup.HAS_PHP_JPEG
-    );
-
-    addTest(
-        'Use EXIF thumbs', 'PHP EXIF extension available',
-        setup.HAS_PHP_EXIF
-    );
-
-    addTest(
-        'Movie thumbs', 'Command line program <code>avconv</code> or <code>ffmpeg</code> available',
-        setup.HAS_CMD_AVCONV || setup.HAS_CMD_FFMPEG
-    );
-
-    addTest(
-        'PDF thumbs', 'Command line program <code>convert</code> or <code>gm</code> available',
-        setup.HAS_CMD_CONVERT || setup.HAS_CMD_GM
-    );
-
-    addTest(
-        'Shell tar', 'Command line program <code>tar</code> available',
-        setup.HAS_CMD_TAR
-    );
-
-    addTest(
-        'Shell zip', 'Command line program <code>zip</code> available',
-        setup.HAS_CMD_ZIP
-    );
-
-    addTest(
-        'Shell du', 'Command line program <code>du</code> available',
+        'Shell du', 'Command line program <code>du</code> available (folder sizes with type "shell-du")',
         setup.HAS_CMD_DU
     );
 };

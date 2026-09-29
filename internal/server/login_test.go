@@ -62,7 +62,8 @@ func TestLoginFlow(t *testing.T) {
 	cookie := cookies[0].Name + "=" + cookies[0].Value
 	_, res, _ = postAs(s, `{"action":"get","setup":true}`, map[string]string{"Cookie": cookie})
 	setup := res["setup"].(map[string]any)
-	if setup["AS_ADMIN"] != true || setup["VERSION"] != "test" || setup["HAS_CMD_DU"] == nil {
+	if setup["AS_ADMIN"] != true || setup["VERSION"] != "test" || setup["HAS_CMD_DU"] == nil ||
+		setup["GO_VERSION"] == nil || setup["HAS_WRITABLE_CACHE"] != true || setup["PHP_VERSION"] != nil {
 		t.Errorf("admin setup = %v", setup)
 	}
 

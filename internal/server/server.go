@@ -13,7 +13,6 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -206,7 +205,7 @@ func unescape(p string) (string, error) {
 	return b.String(), nil
 }
 
-var checkedCommands = []string{"avconv", "convert", "du", "ffmpeg", "gm", "magick", "tar", "zip"}
+var checkedCommands = []string{"avconv", "convert", "du", "ffmpeg", "gm", "magick"}
 
 func (s *Server) detectCommands() {
 	cmds := map[string]bool{}
@@ -221,8 +220,8 @@ func (s *Server) hasCommand(name string) bool {
 	return (*s.commands.Load())[name]
 }
 
-// setupInfo is the "setup" the client reads. The admin keys feed the
-// checks of the h5fs info page, whose labels still mention PHP.
+// setupInfo is the "setup" the client reads; the admin keys feed the
+// checks of the info page.
 func (s *Server) setupInfo(admin bool) map[string]any {
 	setup := map[string]any{
 		"AS_ADMIN":    admin,
@@ -232,24 +231,13 @@ func (s *Server) setupInfo(admin bool) map[string]any {
 	if !admin {
 		return setup
 	}
-	writable := s.cacheDir != "" && dirWritable(s.cacheDir)
 	setup["VERSION"] = s.version
-	setup["PHP_VERSION"] = runtime.Version()
-	setup["MIN_PHP_VERSION"] = runtime.Version()
-	setup["PHP_ARCH"] = strconv.Itoa(strconv.IntSize) + "-bit"
-	setup["HAS_PHP_EXIF"] = true
-	setup["HAS_PHP_JPEG"] = true
-	setup["SERVER_NAME"] = "vitrine"
-	setup["SERVER_VERSION"] = s.version
-	setup["HAS_SERVER"] = true
-	setup["INDEX_HREF"] = PublicHref
-	setup["HAS_WRITABLE_CACHE_PUB"] = writable
-	setup["HAS_WRITABLE_CACHE_PRV"] = writable
+	setup["GO_VERSION"] = runtime.Version()
+	setup["PLATFORM"] = runtime.GOOS + "/" + runtime.GOARCH
+	setup["HAS_WRITABLE_CACHE"] = s.cacheDir != "" && dirWritable(s.cacheDir)
 	for _, c := range checkedCommands {
 		setup["HAS_CMD_"+strings.ToUpper(c)] = s.hasCommand(c)
 	}
-	// the info page checks "convert", ImageMagick 7 installs "magick"
-	setup["HAS_CMD_CONVERT"] = s.hasCommand("convert") || s.hasCommand("magick")
 	return setup
 }
 
