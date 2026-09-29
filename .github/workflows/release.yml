@@ -1,0 +1,193 @@
+name: release
+
+# Builds the linux/amd64 and linux/arm64 images on native runners and
+# publishes them as one multi-arch image to ghcr.io/<owner>/vitrine.
+# Releases are tagged by hand: pushing a tag vX.Y.Z publishes X.Y.Z; a manual
+# run publishes the version in cmd/vitrine/version.go.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: vitrine
+
+jobs:
+  prepare:
+    name: Parse version
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      alpine: ${{ steps.parse.outputs.alpine }}
+      latest: ${{ steps.parse.outputs.latest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Parse version and base image from the repository
+        id: parse
+        shell: bash
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          CODE_VERS=$(sed -n 's/^const Version = "\(.*\)"$/\1/p' cmd/vitrine/version.go)
+          ALPINE=$(grep -E '^FROM alpine:' Dockerfile | tail -n 1 | sed 's/^FROM alpine:\([0-9.]*\).*/\1/')
+          if [ "$REF_TYPE" = "tag" ]; then
+            VERSION="${REF_NAME#v}"
+          else
+            VERSION="$CODE_VERS"
+          fi
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "Error: '$VERSION' is not a version (X.Y.Z)"
+            exit 1
+          fi
+          if [ -z "$ALPINE" ]; then
+            echo "Error: no 'FROM alpine:' in the Dockerfile"
+            exit 1
+          fi
+          # a tag has to match the version in the source
+          if [ "$REF_TYPE" = "tag" ] && [ "${VERSION%%-*}" != "${CODE_VERS%%-*}" ]; then
+            echo "Error: tag $REF_NAME does not match version $CODE_VERS in cmd/vitrine/version.go"
+            exit 1
+          fi
+          # pre-releases do not move "latest"
+          LATEST=true
+          case "$VERSION" in *-*) LATEST=false ;; esac
+          echo "VERSION: '${VERSION}'"
+          echo "ALPINE: '${ALPINE}'"
+          echo "LATEST: '${LATEST}'"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "alpine=${ALPINE}" >> "$GITHUB_OUTPUT"
+          echo "latest=${LATEST}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build and Push (${{ matrix.arch }})
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - arch: linux/amd64
+            runs-on: ubuntu-24.04
+          - arch: linux/arm64
+            runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
+    needs: prepare
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Login to ghcr.io
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Normalize Architectures Tags
+        id: normalize
+        run: |
+          ARCH_TAG=$(echo "${{ matrix.arch }}" | xargs basename | tr -d '[:space:]')
+          echo "${ARCH_TAG}"
+          echo "arch_tag=${ARCH_TAG}" >> "$GITHUB_OUTPUT"
+      # Each architecture is pushed by digest only, so no intermediate tags
+      # exist that would have to be deleted later.
+      - name: Build and Push Image (${{ matrix.arch }})
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          platforms: ${{ matrix.arch }}
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.version }}
+            REVISION=${{ github.sha }}
+            BRANCH=${{ github.ref_type == 'branch' && github.ref_name || '' }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+          provenance: false
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ env.IMAGE_NAME }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ env.IMAGE_NAME }}-${{ matrix.arch }}
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/digests"
+          touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
+      - name: Upload digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ steps.normalize.outputs.arch_tag }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Create and Push Multi-Arch Manifest
+    runs-on: ubuntu-24.04
+    needs:
+      - prepare
+      - build
+    permissions:
+      packages: write
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-*
+          merge-multiple: true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Login to ghcr.io
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create and Push Manifest linux/amd64, linux/arm64
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          ALPINE: ${{ needs.prepare.outputs.alpine }}
+          LATEST: ${{ needs.prepare.outputs.latest }}
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          TAGS=(--tag "${IMAGE}:${VERSION}" --tag "${IMAGE}:${VERSION}-alpine${ALPINE}")
+          if [ "$LATEST" = "true" ]; then
+            TAGS+=(--tag "${IMAGE}:latest")
+          fi
+          if [ "$(ls | wc -l)" != "2" ]; then
+            echo "Error: expected the digests of 2 architectures"
+            ls
+            exit 1
+          fi
+          docker buildx imagetools create "${TAGS[@]}" $(printf "${IMAGE}@sha256:%s " *)
+      - name: Inspect the image
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: docker buildx imagetools inspect "${IMAGE}:${VERSION}"
+
+  cleanup:
+    name: Cleanup Untagged Images
+    runs-on: ubuntu-slim
+    needs:
+      - prepare
+      - merge
+    permissions:
+      packages: write
+    steps:
+      - name: Cleanup Untagged Images
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          delete-untagged: true
+          owner: ${{ github.repository_owner }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          package: ${{ env.IMAGE_NAME }}

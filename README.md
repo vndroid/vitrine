@@ -60,6 +60,15 @@ checkout still records the revision.
 
 ### Docker
 
+Multi-arch images (linux/amd64, linux/arm64) are published to the GitHub
+Container Registry for tagged releases:
+
+```sh
+docker pull ghcr.io/vndroid/vitrine:latest   # or a version, e.g. :0.3.1
+```
+
+To build it yourself:
+
 ```sh
 docker build -t vitrine .
 docker run -d -p 8080:8080 \
