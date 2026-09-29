@@ -1,12 +1,16 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/vndroid/vitrine/web"
 )
@@ -174,4 +178,80 @@ func TestPartialOverrideKeepsDefaults(t *testing.T) {
 	if c.String("view.theme", "") != "comity" {
 		t.Error("untouched defaults must stay")
 	}
+}
+
+func TestReload(t *testing.T) {
+	dir := t.TempDir()
+	opts := filepath.Join(dir, "options.json")
+	os.WriteFile(opts, []byte(`{"search": {"enabled": false}}`), 0o600)
+	c, err := Load(dir, web.Conf())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.SetLoginCheck(func(h string) bool { return h != "" })
+	if c.Bool("search.enabled", true) || c.Options()["hasCustomPasshash"] != false {
+		t.Fatal("initial config")
+	}
+
+	os.WriteFile(opts, []byte(`{"search": {"enabled": true}, "passhash": "x", "view": {"hidden": ["^secret"]}}`), 0o600)
+	if err := c.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	if !c.Bool("search.enabled", false) || !c.IsHidden("secret.txt") || c.Passhash() != "x" {
+		t.Error("reload not applied")
+	}
+	if c.Options()["hasCustomPasshash"] != true {
+		t.Error("login check must be applied on reload")
+	}
+
+	os.WriteFile(opts, []byte(`{"search": {`), 0o600)
+	if err := c.Reload(); err == nil {
+		t.Error("broken options.json must fail")
+	}
+	if !c.Bool("search.enabled", false) {
+		t.Error("a failed reload must keep the current config")
+	}
+}
+
+func TestWatch(t *testing.T) {
+	dir := t.TempDir()
+	opts := filepath.Join(dir, "options.json")
+	os.WriteFile(opts, []byte(`{"title": {"enabled": false}}`), 0o600)
+	c, _ := Load(dir, web.Conf())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go c.Watch(ctx, 10*time.Millisecond, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	time.Sleep(30 * time.Millisecond)
+	os.WriteFile(opts, []byte(`{"title": {"enabled": true}}`), 0o600)
+	deadline := time.Now().Add(2 * time.Second)
+	for !c.Bool("title.enabled", false) {
+		if time.Now().After(deadline) {
+			t.Fatal("change not picked up")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestConcurrentReload(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "options.json"), []byte(`{}`), 0o600)
+	c, _ := Load(dir, web.Conf())
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 200; j++ {
+				c.IsHidden(".git")
+				c.FileType("a.jpg")
+				c.Bool("download.enabled", false)
+				_ = c.Options()["view"]
+			}
+		}()
+	}
+	for j := 0; j < 20; j++ {
+		c.Reload()
+	}
+	wg.Wait()
 }

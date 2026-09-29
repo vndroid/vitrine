@@ -1,10 +1,13 @@
 // Package config loads the h5fs-compatible configuration: options.json,
 // types.json and the l10n translations. Files in the config directory
-// override the embedded defaults file by file.
+// override the embedded defaults file by file. Like h5fs, which read the
+// files on every request, changes are picked up while running (Watch,
+// Reload); requests keep using the snapshot they started with.
 package config
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +19,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/vndroid/vitrine/internal/jsonc"
 	"github.com/vndroid/vitrine/internal/pattern"
@@ -23,8 +29,18 @@ import (
 
 var isoCodeRe = regexp.MustCompile(`^[a-z]{2}(-[a-z]{2})?$`)
 
-// Config is the loaded configuration. It is read-only after Load.
+// Config is the configuration. Its content is an immutable snapshot that
+// Reload replaces atomically.
 type Config struct {
+	dir      string
+	defaults fs.FS
+
+	mu         sync.Mutex // serializes loading
+	loginCheck func(passhash string) bool
+	cur        atomic.Pointer[snapshot]
+}
+
+type snapshot struct {
 	options  map[string]any
 	passhash string
 	types    json.RawMessage
@@ -42,20 +58,60 @@ type typeRE struct {
 // Load reads the configuration from dir (may be empty), falling back to
 // the embedded defaults for every file missing there.
 func Load(dir string, defaults fs.FS) (*Config, error) {
-	src := layered{dir: dir, defaults: defaults}
-	c := &Config{}
-
-	// options.json of the config directory is merged over the defaults, so
-	// a partial file can't drop defaults like the hidden patterns
-	raw, err := fs.ReadFile(defaults, "options.json")
+	c := &Config{dir: dir, defaults: defaults}
+	s, err := c.load()
 	if err != nil {
 		return nil, err
 	}
-	if err := decode(raw, &c.options); err != nil {
+	c.cur.Store(s)
+	return c, nil
+}
+
+// Reload reads the configuration again. On errors the current one stays.
+func (c *Config) Reload() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s, err := c.load()
+	if err != nil {
+		return err
+	}
+	c.cur.Store(s)
+	return nil
+}
+
+// SetLoginCheck sets how the passhash is validated; the client reads the
+// result as "hasCustomPasshash" (name kept for compatibility).
+func (c *Config) SetLoginCheck(check func(passhash string) bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.loginCheck = check
+	old := c.snap()
+	s := *old
+	s.options = make(map[string]any, len(old.options)+1)
+	for k, v := range old.options {
+		s.options[k] = v
+	}
+	s.options["hasCustomPasshash"] = check(s.passhash)
+	c.cur.Store(&s)
+}
+
+func (c *Config) snap() *snapshot { return c.cur.Load() }
+
+func (c *Config) load() (*snapshot, error) {
+	src := layered{dir: c.dir, defaults: c.defaults}
+	s := &snapshot{}
+
+	// options.json of the config directory is merged over the defaults, so
+	// a partial file can't drop defaults like the hidden patterns
+	raw, err := fs.ReadFile(c.defaults, "options.json")
+	if err != nil {
+		return nil, err
+	}
+	if err := decode(raw, &s.options); err != nil {
 		return nil, fmt.Errorf("default options.json: %w", err)
 	}
-	if c.options == nil {
-		c.options = map[string]any{}
+	if s.options == nil {
+		s.options = map[string]any{}
 	}
 	if raw, ok, err := src.readOverride("options.json"); err != nil {
 		return nil, err
@@ -64,59 +120,109 @@ func Load(dir string, defaults fs.FS) (*Config, error) {
 		if err := decode(raw, &override); err != nil {
 			return nil, fmt.Errorf("options.json: %w", err)
 		}
-		merge(c.options, override)
+		merge(s.options, override)
 	}
-	if s, ok := c.options["passhash"].(string); ok {
-		c.passhash = strings.TrimSpace(s)
+	if p, ok := s.options["passhash"].(string); ok {
+		s.passhash = strings.TrimSpace(p)
 	}
-	delete(c.options, "passhash")
+	delete(s.options, "passhash")
+	if c.loginCheck != nil {
+		s.options["hasCustomPasshash"] = c.loginCheck(s.passhash)
+	}
 
-	if c.types, c.typeREs, err = loadTypes(src); err != nil {
+	if s.types, s.typeREs, err = loadTypes(src); err != nil {
 		return nil, err
 	}
 
-	for _, p := range c.Strings("view.hidden") {
+	for _, p := range stringList(s, "view.hidden") {
 		re, err := pattern.Compile(p, false)
 		if err != nil {
 			slog.Warn("ignoring unsupported view.hidden pattern", "pattern", p, "err", err)
 			continue
 		}
-		c.hidden = append(c.hidden, re)
+		s.hidden = append(s.hidden, re)
 	}
 
-	if c.l10n, c.langs, err = loadL10n(src); err != nil {
+	if s.l10n, s.langs, err = loadL10n(src); err != nil {
 		return nil, err
 	}
-	return c, nil
+	return s, nil
 }
 
-// SetLoginEnabled records whether the admin login is available; the
-// client reads it as "hasCustomPasshash" (name kept for compatibility).
-func (c *Config) SetLoginEnabled(enabled bool) {
-	c.options["hasCustomPasshash"] = enabled
+// Watch reloads the configuration whenever the files of the config
+// directory change, checking every interval until ctx is done.
+func (c *Config) Watch(ctx context.Context, interval time.Duration, log *slog.Logger) {
+	if c.dir == "" {
+		return
+	}
+	last := c.fingerprint()
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		fp := c.fingerprint()
+		if fp == last {
+			continue
+		}
+		last = fp
+		if err := c.Reload(); err != nil {
+			log.Error("config reload failed, keeping the current config", "err", err)
+		} else {
+			log.Info("config reloaded", "dir", c.dir)
+		}
+	}
+}
+
+// fingerprint summarizes name, size and time of the config files.
+func (c *Config) fingerprint() string {
+	var b strings.Builder
+	add := func(p string) {
+		if fi, err := os.Stat(p); err == nil {
+			fmt.Fprintf(&b, "%s:%d:%d;", p, fi.Size(), fi.ModTime().UnixNano())
+		} else {
+			fmt.Fprintf(&b, "%s:-;", p)
+		}
+	}
+	add(filepath.Join(c.dir, "options.json"))
+	add(filepath.Join(c.dir, "types.json"))
+	l10n := filepath.Join(c.dir, "l10n")
+	if entries, err := os.ReadDir(l10n); err == nil {
+		for _, e := range entries {
+			add(filepath.Join(l10n, e.Name()))
+		}
+	}
+	return b.String()
 }
 
 // Passhash returns the configured admin password hash (may be empty).
-func (c *Config) Passhash() string { return c.passhash }
+func (c *Config) Passhash() string { return c.snap().passhash }
 
 // Options returns the options as sent to the client (without passhash).
-func (c *Config) Options() map[string]any { return c.options }
+func (c *Config) Options() map[string]any { return c.snap().options }
 
 // Types returns types.json as sent to the client, in its original order.
-func (c *Config) Types() json.RawMessage { return c.types }
+func (c *Config) Types() json.RawMessage { return c.snap().types }
 
 // Langs maps the available iso codes to the language names.
-func (c *Config) Langs() map[string]string { return c.langs }
+func (c *Config) Langs() map[string]string { return c.snap().langs }
 
 // L10n returns the translations of an iso code.
 func (c *Config) L10n(isoCode string) (map[string]any, bool) {
-	t, ok := c.l10n[isoCode]
+	t, ok := c.snap().l10n[isoCode]
 	return t, ok
 }
 
 // Get returns the option at a dot separated key path.
 func (c *Config) Get(keypath string) (any, bool) {
-	var v any = c.options
+	return get(c.snap(), keypath)
+}
+
+func get(s *snapshot, keypath string) (any, bool) {
+	var v any = s.options
 	for _, key := range strings.Split(keypath, ".") {
 		if key == "" {
 			continue
@@ -199,7 +305,11 @@ func (c *Config) getString(keypath string) (string, bool) {
 
 // Strings returns the string elements of an array option.
 func (c *Config) Strings(keypath string) []string {
-	v, _ := c.Get(keypath)
+	return stringList(c.snap(), keypath)
+}
+
+func stringList(s *snapshot, keypath string) []string {
+	v, _ := get(s, keypath)
 	arr, _ := v.([]any)
 	out := make([]string, 0, len(arr))
 	for _, e := range arr {
@@ -225,7 +335,7 @@ func (c *Config) IsHidden(name string) bool {
 	if name == "." || name == ".." {
 		return true
 	}
-	for _, re := range c.hidden {
+	for _, re := range c.snap().hidden {
 		if re.MatchString(name) {
 			return true
 		}
@@ -237,7 +347,7 @@ func (c *Config) IsHidden(name string) bool {
 // (case insensitive, the last matching type wins), like the client.
 func (c *Config) FileType(name string) string {
 	result := "file"
-	for _, t := range c.typeREs {
+	for _, t := range c.snap().typeREs {
 		if t.re.MatchString(name) {
 			result = t.name
 		}

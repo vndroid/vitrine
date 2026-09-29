@@ -25,6 +25,9 @@ import (
 	"golang.org/x/term"
 )
 
+// configWatchInterval is how often the config folder is checked.
+const configWatchInterval = 2 * time.Second
+
 // version is set at build time with -ldflags "-X main.version=...".
 var version = ""
 
@@ -111,6 +114,21 @@ func run(args []string) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// like h5fs, config changes apply without a restart: the config folder
+	// is checked every few seconds, SIGHUP reloads immediately
+	go cfg.Watch(ctx, configWatchInterval, log)
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	go func() {
+		for range hup {
+			if err := cfg.Reload(); err != nil {
+				log.Error("config reload failed, keeping the current config", "err", err)
+			} else {
+				log.Info("config reloaded (SIGHUP)")
+			}
+		}
+	}()
 	errc := make(chan error, 1)
 	go func() {
 		log.Info("vitrine started", "version", buildVersion(), "listen", *listen, "root", tr.Root())

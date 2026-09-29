@@ -78,6 +78,11 @@ documented there). A config folder may contain:
 - `l10n/<code>.json`: adds or replaces translations
 - `ext/`: files for the `resources` option (extra scripts and styles)
 
+Changes to these files apply without a restart: vitrine checks the config
+folder every 2 seconds, `SIGHUP` (`docker kill -s HUP <container>`)
+reloads at once. A file with errors is logged and the previous config
+stays active.
+
 ## Security
 
 - Only entries of "managed" folders below the root are listed and

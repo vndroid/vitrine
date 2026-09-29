@@ -82,7 +82,7 @@ func New(o Options) *Server {
 	if o.ConfigDir != "" {
 		s.extDir = filepath.Join(o.ConfigDir, "ext")
 	}
-	s.cfg.SetLoginEnabled(auth.LoginEnabled(s.cfg.Passhash()))
+	s.cfg.SetLoginCheck(auth.LoginEnabled)
 	s.detectCommands()
 	if o.CacheDir != "" {
 		ts, err := thumb.New(o.Tree, o.Config, o.CacheDir, s.hasCommand, s.log)
