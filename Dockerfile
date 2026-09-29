@@ -1,19 +1,21 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.26-alpine AS build
+FROM golang:1.26-alpine3.23 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 # .git is not in the build context, pass the commit:
 #   --build-arg REVISION=$(git rev-parse HEAD) --build-arg BRANCH=$(git branch --show-current)
-ARG VERSION="" REVISION="" BRANCH=""
+ARG VERSION=""
+ARG REVISION=""
+ARG BRANCH=""
 RUN CGO_ENABLED=0 go build -trimpath -tags netgo -ldflags "-s -w \
       -X main.version=${VERSION} -X main.revision=${REVISION} -X main.branch=${BRANCH} \
       -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     -o /out/vitrine ./cmd/vitrine
 
-FROM alpine:3
+FROM alpine:3.23
 # ffmpeg: video thumbnails; imagemagick + ghostscript: pdf/ps thumbnails,
 # imagemagick-heic: AVIF/HEIC thumbnails, imagemagick-jpeg: jpeg output;
 # coreutils: "du" for foldersize.type "shell-du"
