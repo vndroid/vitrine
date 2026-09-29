@@ -45,7 +45,7 @@ const addTests = () => {
     dom(testsTpl).appTo('#content');
 
     addTest(
-        'vitrine version', 'Only green if this is an official vitrine release',
+        'Version', 'Only green if this is an official vitrine release',
         (/^\d+\.\d+\.\d+$/).test(setup.VERSION), setup.VERSION
     );
 
@@ -80,12 +80,12 @@ const addTests = () => {
     );
 
     addTest(
-        'PDF thumbs', 'ImageMagick (<code>magick</code>) available',
+        'PDF thumbs', 'Command line program <code>magick</code> available',
         setup.HAS_CMD_MAGICK
     );
 
     addTest(
-        'Shell du', 'Command line program <code>du</code> available (folder sizes with type "shell-du")',
+        'Shell du', 'Command line program <code>du</code> available (Folder size calculation)',
         setup.HAS_CMD_DU
     );
 };
