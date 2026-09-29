@@ -21,7 +21,7 @@ const defaultTranslations = {
     dateFormat: 'YYYY-MM-DD HH:mm',
     details: 'details',
     download: 'download',
-    previewUnsupported: 'This file can\'t be played in the browser.',
+    previewUnsupported: 'The browser can\'t open this file.',
     empty: 'empty',
     files: 'files',
     filter: 'filter',

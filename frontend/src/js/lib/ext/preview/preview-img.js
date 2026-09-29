@@ -3,6 +3,7 @@ import server from '../../server.js';
 import allsettings from '../../core/settings.js';
 import preview from './preview.js';
 const {dom} = util;
+const win = global.window;
 
 
 const settings = Object.assign({
@@ -47,11 +48,29 @@ const requestSample = href => {
 const load = item => {
     return Promise.resolve(item.absHref)
         .then(href => {
-            return settings.size ? requestSample(href) : href;
+            // without a sample (e.g. too large to scale) show the original
+            return settings.size ? requestSample(href).then(sample => sample || href) : href;
         })
         .then(href => new Promise(resolve => {
-            const $el = dom(tpl)
-                .on('load', () => resolve($el))
+            const $el = dom(tpl);
+            const el = $el[0];
+            let timer = null;
+            const done = content => {
+                if (timer !== null) {
+                    win.clearInterval(timer);
+                    timer = null;
+                    resolve(content);
+                }
+            };
+            // show the image as soon as its size is known, the browser draws
+            // the rest while it loads (large or progressive images)
+            timer = win.setInterval(() => {
+                if (el.naturalWidth > 0) {
+                    done($el);
+                }
+            }, 50);
+            $el.on('load', () => done($el))
+                .on('error', () => done(preview.unsupported(item)))
                 .attr('src', href);
         }));
 };

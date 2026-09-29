@@ -4,7 +4,7 @@
     "dateFormat": "YYYY-MM-DD HH:mm",
     "details": "详情",
     "download": "下载",
-    "previewUnsupported": "浏览器无法播放此文件。",
+    "previewUnsupported": "浏览器无法打开此文件。",
     "empty": "空文件夹",
     "files": "文件",
     "filter": "过滤",

@@ -5,7 +5,7 @@ import allsettings from '../../core/settings.js';
 import store from '../../core/store.js';
 const unsupportedTpl =
         `<div id="pv-content-unsupported">
-            <p class="l10n-previewUnsupported">This file can't be played in the browser.</p>
+            <p class="l10n-previewUnsupported">The browser can't open this file.</p>
             <a class="l10n-download">download</a>
         </div>`;
 const {each, isFn, dom, includes, compact} = util;
@@ -291,8 +291,8 @@ const init = () => {
         .on('load', updateGui);
 };
 
-// Content shown instead of a player the browser can't use: a message and
-// a download link.
+// Content shown for files the browser can't open (unsupported format or
+// broken file): a message and a download link.
 const unsupported = item => {
     const $el = dom(unsupportedTpl);
     $el.find('a').attr('href', item.absHref).attr('download', item.label);
