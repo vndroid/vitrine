@@ -2,6 +2,7 @@ package thumb
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 	"image"
 	"image/color"
@@ -446,5 +447,48 @@ func TestServiceUsesEXIFOption(t *testing.T) {
 	img, _ := jpeg.Decode(f)
 	if !near(img.At(5, 5), 255, 0, 0) {
 		t.Error("thumbnails.exif must use the embedded thumbnail")
+	}
+}
+
+// a 1x1 lossy WebP
+const tinyWebP = "UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA="
+
+func TestWebPThumb(t *testing.T) {
+	s, root := service(t, "")
+	data, _ := base64.StdEncoding.DecodeString(tinyWebP)
+	writeFile(t, filepath.Join(root, "w.webp"), data)
+	if _, ok := s.Thumb("img", "/w.webp", 240, 240); !ok {
+		t.Error("webp thumbnail failed")
+	}
+}
+
+func TestMagickImagesNeedImageMagick(t *testing.T) {
+	s, root := service(t, "")
+	s.hasCmd = func(string) bool { return false }
+	writeFile(t, filepath.Join(root, "p.heic"), []byte("not really heic"))
+	if _, ok := s.Thumb("img", "/p.heic", 240, 240); ok {
+		t.Error("heic without ImageMagick must fail")
+	}
+}
+
+func TestAVIFCapture(t *testing.T) {
+	tool := ""
+	for _, c := range []string{"magick", "convert"} {
+		if _, err := exec.LookPath(c); err == nil {
+			tool = c
+			break
+		}
+	}
+	if tool == "" {
+		t.Skip("ImageMagick not installed")
+	}
+	s, root := service(t, "")
+	s.hasCmd = func(c string) bool { _, err := exec.LookPath(c); return err == nil }
+	p := filepath.Join(root, "a.avif")
+	if out, err := exec.Command(tool, "-size", "64x48", "xc:red", p).CombinedOutput(); err != nil {
+		t.Skipf("ImageMagick can't write AVIF here: %s", out)
+	}
+	if _, ok := s.Thumb("img", "/a.avif", 240, 240); !ok {
+		t.Error("avif thumbnail failed")
 	}
 }

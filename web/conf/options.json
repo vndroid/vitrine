@@ -264,7 +264,7 @@
     "preview-img": {
         "enabled": true,
         "size": false,
-        "types": ["img", "img-bmp", "img-gif", "img-ico", "img-jpg", "img-png", "img-raw", "img-svg"]
+        "types": ["img", "img-avif", "img-bmp", "img-gif", "img-ico", "img-jpg", "img-png", "img-raw", "img-svg", "img-webp"]
     },
 
     /*
@@ -377,7 +377,8 @@
     directory (--cache flag).
 
     - img: array of strings, file types (see "types.json") rendered by vitrine,
-        supported: img-bmp, img-gif, img-jpg, img-png
+        supported: img-bmp, img-gif, img-jpg, img-png, img-webp; img-avif and
+        img-heic are converted with ImageMagick (needs its HEIF support)
     - mov: array of strings, file types captured with ffmpeg/avconv, supported:
         vid-avi, vid-flv, vid-mkv, vid-mov, vid-mp4, vid-mpg, vid-ts, vid-vob, vid-webm, vid-wmv
     - doc: array of strings, file types captured with ImageMagick/GraphicsMagick, supported:
@@ -396,7 +397,7 @@
     */
     "thumbnails": {
         "enabled": true,
-        "img": ["img-bmp", "img-gif", "img-ico", "img-jpg", "img-png"],
+        "img": ["img-avif", "img-bmp", "img-gif", "img-heic", "img-ico", "img-jpg", "img-png", "img-webp"],
         "mov": ["vid-avi", "vid-flv", "vid-mkv", "vid-mov", "vid-mp4", "vid-mpg", "vid-webm"],
         "doc": ["x-pdf", "x-ps"],
         "delay": 1,

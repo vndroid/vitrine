@@ -17,8 +17,9 @@ with a self-contained server that serves the files itself.
   sorting, filter and search
 - previews for images, audio, video (streamed with HTTP Range), text,
   markdown and source code
-- thumbnails for images (EXIF orientation aware), videos (ffmpeg) and
-  PDF/PostScript (ImageMagick), cached with a size limit
+- thumbnails for images (JPEG, PNG, GIF, BMP, WebP; AVIF and HEIC with
+  ImageMagick; EXIF orientation aware), videos (ffmpeg) and PDF/PostScript
+  (ImageMagick), cached with a size limit
 - packaged downloads as tar or zip, streamed with limits
 - custom header and footer per folder, 35 languages, QR codes
 - admin info page with login (bcrypt, rate limited)

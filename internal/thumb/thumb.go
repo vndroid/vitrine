@@ -42,7 +42,7 @@ var (
 )
 
 var defaultCategoryTypes = map[string][]string{
-	"img": {"img-bmp", "img-gif", "img-ico", "img-jpg", "img-png"},
+	"img": {"img-avif", "img-bmp", "img-gif", "img-heic", "img-ico", "img-jpg", "img-png", "img-webp"},
 	"mov": {"vid-avi", "vid-flv", "vid-mkv", "vid-mov", "vid-mp4", "vid-mpg", "vid-webm"},
 	"doc": {"x-pdf", "x-ps"},
 }
@@ -53,6 +53,9 @@ var movFormats = map[string]string{
 	"vid-mp4": "mov", "vid-mpg": "mpeg", "vid-ts": "mpegts", "vid-vob": "mpeg",
 	"vid-webm": "matroska", "vid-wmv": "asf",
 }
+
+// file type => ImageMagick coder, for images Go can't decode
+var magickImages = map[string]string{"img-avif": "avif", "img-heic": "heic"}
 
 // file type => ImageMagick/GraphicsMagick coder
 var docFormats = map[string]string{"x-pdf": "pdf", "x-ps": "ps", "x-eps": "eps"}
@@ -120,6 +123,8 @@ func (s *Service) Thumb(typ, href string, width, height int) (string, bool) {
 	}
 
 	switch category {
+	case "img":
+		src, ok = s.captureImage(fileType, src)
 	case "mov":
 		src, ok = s.captureMov(fileType, src)
 	case "doc":
@@ -247,6 +252,25 @@ func (s *Service) captureMov(fileType, src string) (string, bool) {
 	}
 	// videos shorter than 10 seconds: fall back to the first frame
 	return s.capture(src, cmd("0:00:10", ""), cmd("0:00:00", ""))
+}
+
+// captureImage converts images Go can't decode (AVIF, HEIC) to JPEG with
+// ImageMagick; other images are used as they are.
+func (s *Service) captureImage(fileType, src string) (string, bool) {
+	format, ok := magickImages[fileType]
+	if !ok {
+		return src, true
+	}
+	in := format + ":" + src + "[0]"
+	resize := fmt.Sprintf("%dx%d>", maxThumbDimension, maxThumbDimension)
+	args := []string{in, "-auto-orient", "-resize", resize, "-quality", "90", "-strip", "jpg:"}
+	switch {
+	case s.hasCmd("magick"):
+		return s.capture(src, append([]string{"magick"}, args...))
+	case s.hasCmd("convert"):
+		return s.capture(src, append([]string{"convert"}, args...))
+	}
+	return "", false
 }
 
 func (s *Service) captureDoc(fileType, src string) (string, bool) {
