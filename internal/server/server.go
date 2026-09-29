@@ -205,15 +205,15 @@ func (s *Server) serveShared(w http.ResponseWriter, r *http.Request, href string
 			s.renderPage(w, r, "index", p)
 			return
 		}
-		if index, ok := s.tree.ResolveUnmanagedIndex(p); ok {
-			s.serveFile(w, r, index)
+		if f, ok := s.tree.OpenUnmanagedIndex(p); ok {
+			s.serveFile(w, r, f)
 			return
 		}
 		s.notFound(w)
 		return
 	}
-	if real, ok := s.tree.ResolveManagedFile(p); ok {
-		s.serveFile(w, r, real)
+	if f, ok := s.tree.OpenManagedFile(p); ok {
+		s.serveFile(w, r, f)
 		return
 	}
 	s.notFound(w)

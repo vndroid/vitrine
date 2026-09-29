@@ -6,6 +6,7 @@ package tree
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -272,25 +273,74 @@ func (t *Tree) IsManagedHref(href string) bool {
 // be served: a regular file in a managed folder that is not hidden, both
 // for the path the client asked for and, inside the root, for the target.
 func (t *Tree) ResolveManagedFile(path string) (string, bool) {
+	real, _, ok := t.resolveFile(path)
+	return real, ok
+}
+
+// resolveFile is ResolveManagedFile that also returns the FileInfo the
+// checks were made on.
+func (t *Tree) resolveFile(path string) (string, fs.FileInfo, bool) {
 	real, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return "", false
+		return "", nil, false
 	}
 	fi, err := os.Stat(real)
 	if err != nil || !fi.Mode().IsRegular() || t.isExcluded(real) {
-		return "", false
+		return "", nil, false
 	}
 	if !t.visiblePath(path) || !t.IsManagedPath(filepath.Dir(path)) {
-		return "", false
+		return "", nil, false
 	}
 	if !within(real, t.root) {
-		return real, t.follow
+		return real, fi, t.follow
 	}
 	parent, ok := t.ResolveManagedPath(filepath.Dir(real))
 	if !ok || t.isHiddenEntry(parent, filepath.Base(real)) {
+		return "", nil, false
+	}
+	return real, fi, true
+}
+
+// OpenManagedFile opens a file that ResolveManagedFile accepts. The file
+// is opened once and has to be the very file the checks were made on, so
+// replacing it or one of its folders with a symbolic link between the
+// checks and the open can't serve anything else. Inside the root the open
+// is confined to the root.
+func (t *Tree) OpenManagedFile(path string) (*os.File, bool) {
+	real, fi, ok := t.resolveFile(path)
+	if !ok {
+		return nil, false
+	}
+	return t.openChecked(real, fi)
+}
+
+// openChecked opens real and verifies it is the file described by checked.
+func (t *Tree) openChecked(real string, checked fs.FileInfo) (*os.File, bool) {
+	var f *os.File
+	var err error
+	if rel, ok := t.relToRoot(real); ok {
+		f, err = os.OpenInRoot(t.root, rel)
+	} else {
+		f, err = os.Open(real)
+	}
+	if err != nil {
+		return nil, false
+	}
+	fi, err := f.Stat()
+	if err != nil || !fi.Mode().IsRegular() || !os.SameFile(fi, checked) {
+		f.Close()
+		return nil, false
+	}
+	return f, true
+}
+
+// relToRoot returns the path of a resolved file below the root.
+func (t *Tree) relToRoot(real string) (string, bool) {
+	if !within(real, t.root) || real == t.root {
 		return "", false
 	}
-	return real, true
+	rel, err := filepath.Rel(t.root, real)
+	return rel, err == nil
 }
 
 // ResolveUnmanagedIndex returns the real path of the first
@@ -298,9 +348,24 @@ func (t *Tree) ResolveManagedFile(path string) (string, bool) {
 // instead of a listing. The folder and the file follow the same rules as
 // managed ones, the file must be a regular file directly in the folder.
 func (t *Tree) ResolveUnmanagedIndex(dir string) (string, bool) {
+	real, _, ok := t.resolveIndex(dir)
+	return real, ok
+}
+
+// OpenUnmanagedIndex opens the file ResolveUnmanagedIndex finds, with the
+// guarantees of OpenManagedFile.
+func (t *Tree) OpenUnmanagedIndex(dir string) (*os.File, bool) {
+	real, fi, ok := t.resolveIndex(dir)
+	if !ok {
+		return nil, false
+	}
+	return t.openChecked(real, fi)
+}
+
+func (t *Tree) resolveIndex(dir string) (string, fs.FileInfo, bool) {
 	realDir, ok := t.resolveDir(dir)
 	if !ok {
-		return "", false
+		return "", nil, false
 	}
 	for _, name := range t.cfg.Strings("view.unmanaged") {
 		if name == "" || strings.ContainsAny(name, "/\\") || t.isHiddenEntry(realDir, name) {
@@ -311,8 +376,8 @@ func (t *Tree) ResolveUnmanagedIndex(dir string) (string, bool) {
 			continue
 		}
 		if fi, err := os.Stat(real); err == nil && fi.Mode().IsRegular() {
-			return real, true
+			return real, fi, true
 		}
 	}
-	return "", false
+	return "", nil, false
 }

@@ -2,6 +2,7 @@ package tree
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,6 +155,51 @@ func TestResolveManagedFile(t *testing.T) {
 		if got != want {
 			t.Errorf("ResolveManagedFile(%q) = %v, want %v", rel, got, want)
 		}
+	}
+}
+
+func TestOpenManagedFile(t *testing.T) {
+	tr, root := fixture(t)
+	f, ok := tr.OpenManagedFile(filepath.Join(root, "a.txt"))
+	if !ok {
+		t.Fatal("a.txt not opened")
+	}
+	if b, _ := io.ReadAll(f); string(b) != "aaa" {
+		t.Errorf("a.txt = %q", b)
+	}
+	f.Close()
+	for _, name := range []string{".secret", "sub/.hidden/c.txt", "file-out", "missing.txt"} {
+		if f, ok := tr.OpenManagedFile(filepath.Join(root, name)); ok {
+			f.Close()
+			t.Errorf("%s opened", name)
+		}
+	}
+	if f, ok := tr.OpenUnmanagedIndex(filepath.Join(root, "site")); !ok {
+		t.Error("index.html not opened")
+	} else {
+		f.Close()
+	}
+}
+
+// The file has to be the one that was checked: a file swapped in after the
+// checks (or reached through a link leaving the root) is refused.
+func TestOpenCheckedRejectsSwappedFile(t *testing.T) {
+	tr, root := fixture(t)
+	a := filepath.Join(root, "a.txt")
+	checked, err := os.Stat(filepath.Join(root, "my file#1.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f, ok := tr.openChecked(a, checked); ok {
+		f.Close()
+		t.Error("a different file was opened")
+	}
+	// a folder link inside the path leads out of the root
+	outside := filepath.Join(filepath.Dir(root), "outside", "dir", "x.txt")
+	secret, _ := os.Stat(outside)
+	if f, ok := tr.openChecked(filepath.Join(root, "link-out", "x.txt"), secret); ok {
+		f.Close()
+		t.Error("a file behind a link leaving the root was opened")
 	}
 }
 

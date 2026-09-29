@@ -96,21 +96,16 @@ var activeTypes = map[string]bool{
 // plugin or offered as executable content.
 var plainTypes = map[string]bool{".php": true, ".phar": true}
 
-// serveFile serves a shared file (already resolved and checked by the
-// tree) with Range, If-Modified-Since and HEAD support.
-func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, realPath string) {
-	f, err := os.Open(realPath)
-	if err != nil {
-		s.notFound(w)
-		return
-	}
+// serveFile serves a shared file (opened by the tree, which checked it)
+// with Range, If-Modified-Since and HEAD support, and closes it.
+func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, f *os.File) {
 	defer f.Close()
 	fi, err := f.Stat()
 	if err != nil || !fi.Mode().IsRegular() {
 		s.notFound(w)
 		return
 	}
-	ext := strings.ToLower(filepath.Ext(realPath))
+	ext := strings.ToLower(filepath.Ext(f.Name()))
 	h := w.Header()
 	switch {
 	case plainTypes[ext]:

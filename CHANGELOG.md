@@ -4,6 +4,14 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.2.3 - 2026-09-29
+
+- shared files and folder index files are opened once, after the access
+  checks, and have to be the very file that was checked; inside the root
+  the open can't leave the root, so replacing a file or folder with a
+  symbolic link between the check and the open (TOCTOU) serves nothing
+  else
+
 ## 0.2.2 - 2026-09-29
 
 - every response carries `X-Frame-Options: SAMEORIGIN` and
