@@ -123,6 +123,8 @@ To serve vitrine below a path of an existing site, start it with
 `-base-path /files` and pass the path on unchanged:
 
 ```nginx
+absolute_redirect off;  # nginx's own /files -> /files/ redirect keeps the port
+
 location /files/ {
     proxy_pass http://127.0.0.1:8080;   # no URI part: keep /files/
     # proxy_set_header ... as above
