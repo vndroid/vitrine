@@ -19,16 +19,28 @@ FROM alpine:3.23
 # ffmpeg: video thumbnails; imagemagick + ghostscript: pdf/ps thumbnails,
 # imagemagick-heic: AVIF/HEIC thumbnails, imagemagick-jpeg: jpeg output;
 # coreutils: "du" for foldersize.type "shell-du"
-# uid/gid 1000 matches the first user of most hosts, so mounted config
-# files may stay private (0600)
+# vitrine runs as uid/gid 1000, which matches the first user of most hosts,
+# so mounted config files may stay private (0600). www-data (uid/gid 82,
+# the web server user of Alpine) exists too and vitrine is a member of its
+# group: files of either owner are readable when they are group or world
+# readable, and /cache is writable for both (setgid keeps the group).
+# "docker run --user www-data" runs vitrine as that user instead.
 RUN apk add --no-cache ffmpeg imagemagick imagemagick-heic imagemagick-jpeg ghostscript coreutils \
  && addgroup -S -g 1000 vitrine && adduser -S -u 1000 -G vitrine -H vitrine \
- && mkdir -p /share /cache /config && chown vitrine:vitrine /cache
+ && adduser -S -u 82 -G www-data -H www-data \
+ && addgroup vitrine www-data \
+ && mkdir -p /share /cache /config \
+ && chown vitrine:www-data /cache && chmod 2775 /cache
 COPY --from=build /out/vitrine /usr/local/bin/vitrine
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
 USER vitrine
 ENV VITRINE_ROOT=/share \
     VITRINE_CACHE=/cache \
     VITRINE_LISTEN=:8080
+
 EXPOSE 8080
 VOLUME ["/cache"]
-ENTRYPOINT ["vitrine"]
+WORKDIR /share
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["vitrine"]

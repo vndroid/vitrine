@@ -4,6 +4,17 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.2 - 2026-09-29
+
+- Docker image: an entrypoint passes flags and the commands `validate`,
+  `passwd`, `version` and `help` to vitrine, so `docker run vitrine
+  validate` works like before; any other command runs unchanged
+- Docker image: the user `www-data` (uid/gid 82) exists next to `vitrine`
+  (uid/gid 1000) and `vitrine` is a member of its group; `/cache` is
+  writable for both (setgid), `--user www-data` runs as the web server
+  user. The image still runs as uid 1000 by default
+- the image starts in `/share`
+
 ## 0.4.1 - 2026-09-29
 
 - `vitrine -h` / `--help` prints all commands and flags, each with its

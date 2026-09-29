@@ -80,8 +80,19 @@ docker run -d -p 8080:8080 \
 ```
 
 The image includes ffmpeg, ImageMagick and Ghostscript for video and PDF
-thumbnails and runs as uid/gid 1000. The shared folder can be mounted
-read-only.
+thumbnails. The shared folder can be mounted read-only.
+
+vitrine runs as `vitrine` (uid/gid 1000, like the first user of most
+hosts, so mounted config files may stay private with mode 0600). The user
+`www-data` (uid/gid 82) exists too and `vitrine` is a member of its group,
+so files owned by either are readable when they are group or world
+readable, and `/cache` is writable for both. Files that only their
+owner may read (0600) are not readable by the other one. To run as
+`www-data` instead, use `--user www-data`.
+
+Arguments are passed to vitrine: flags (`-access-log`) and the commands
+`validate`, `passwd`, `version` and `help` work as in
+`docker run --rm vitrine validate`; any other command is run as it is.
 
 ## Configuration
 
