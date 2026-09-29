@@ -109,6 +109,8 @@ clients and session cookies get the `Secure` flag behind TLS:
 vitrine -root /srv/share -listen 127.0.0.1:8080 -trusted-proxy 127.0.0.1
 ```
 
+#### nginx
+
 ```nginx
 location / {
     proxy_pass http://127.0.0.1:8080;
@@ -134,6 +136,39 @@ location /files/ {
     # proxy_set_header ... as above
 }
 ```
+
+#### Caddy
+
+```caddy
+files.example.com {
+    reverse_proxy 127.0.0.1:8080 {
+        # Caddy sets X-Forwarded-For and -Proto itself, but passes a
+        # client's own X-Real-IP on: overwrite it
+        header_up X-Real-IP {client_ip}
+    }
+}
+```
+
+Caddy obtains the TLS certificate and sets `X-Forwarded-Proto`. `encode`
+may be used: Caddy only compresses text responses, so Range requests for
+media keep working.
+
+Below a path, with `-base-path /files`; use `handle`, not `handle_path`,
+which would strip the path vitrine expects:
+
+```caddy
+example.com {
+    redir /files /files/ permanent
+    handle /files/* {
+        reverse_proxy 127.0.0.1:8080 {
+            header_up X-Real-IP {client_ip}
+        }
+    }
+}
+```
+
+If Caddy itself is behind another proxy or a CDN, list those in Caddy's
+`trusted_proxies` server option, so `{client_ip}` is the visitor.
 
 ## Migrating from h5fs
 
