@@ -75,17 +75,17 @@ const addTests = () => {
     );
 
     addTest(
-        'Movie thumbs', 'Command line program <code>ffmpeg</code> available',
+        'Movie thumbs', 'Command line program <code>ffmpeg</code> available, used for video thumbnails',
         setup.HAS_CMD_FFMPEG
     );
 
     addTest(
-        'PDF thumbs', 'Command line program <code>magick</code> available',
+        'Document thumbs', 'Command line program <code>magick</code> available, used for PDF, AVIF and HEIC thumbnails',
         setup.HAS_CMD_MAGICK
     );
 
     addTest(
-        'Shell du', 'Command line program <code>du</code> available (Folder size calculation)',
+        'Shell du', 'Command line program <code>du</code> available, used for calculating folder sizes',
         setup.HAS_CMD_DU
     );
 };
