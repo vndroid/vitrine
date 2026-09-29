@@ -133,3 +133,10 @@
         }
     }
 }
+
+// Long lists: let the browser skip layout and painting of rows outside the
+// viewport (their height comes from contain-intrinsic-size, see view.js).
+// Grid and icon items flow in lines and keep being laid out.
+#view.view-details .item {
+    content-visibility: auto;
+}

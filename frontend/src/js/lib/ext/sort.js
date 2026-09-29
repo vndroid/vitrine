@@ -60,7 +60,10 @@ const sortItems = (column, reverse) => {
     $headers.rmCls('ascending').rmCls('descending');
     $header.addCls(reverse ? 'descending' : 'ascending');
 
-    dom(toArray(dom('#items .item:not(.folder-parent)')).sort(fn)).appTo('#items');
+    // move the rows in one go, see view.js
+    const fragment = global.window.document.createDocumentFragment();
+    each(toArray(dom('#items .item:not(.folder-parent)')).sort(fn), el => fragment.appendChild(el));
+    dom('#items')[0].appendChild(fragment);
 };
 
 const onContentChanged = () => {

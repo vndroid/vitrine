@@ -68,6 +68,9 @@ const createStyles = size => {
         `${detailsPrefix} .square {width: ${dsize}px ${important} height: ${dsize}px ${important}}`,
         `${detailsPrefix} .square img {width: ${dsize}px ${important} height: ${dsize}px ${important}}`,
         `${detailsPrefix} .label {margin-left: ${dsize + 32}px ${important}}`,
+        // placeholder height of rows skipped by content-visibility (line
+        // height plus border), keeps the scrollbar right in long lists
+        `${detailsPrefix} .item {contain-intrinsic-size: auto ${dsize + 15}px}`,
 
         `${gridPrefix} .item .label {line-height: ${gsize}px ${important}}`,
         `${gridPrefix} .square {width: ${gsize}px ${important} height: ${gsize}px ${important}}`,
@@ -184,12 +187,20 @@ const checkHint = () => {
     }
 };
 
+const fragmentOf = items => {
+    const fragment = global.window.document.createDocumentFragment();
+    each(items, item => fragment.appendChild(createHtml(item)[0]));
+    return fragment;
+};
+
 const setItems = items => {
     const removed = map($items.find('.item'), el => el._item);
 
     $items.find('.item').rm();
 
-    each(items, item => $items.app(createHtml(item)));
+    // insert all rows at once: appending them one by one lets the browser
+    // update each row's content-visibility state and gets very slow
+    $items[0].appendChild(fragmentOf(items));
 
     base.$content[0].scrollLeft = 0;
     base.$content[0].scrollTop = 0;
@@ -198,9 +209,7 @@ const setItems = items => {
 };
 
 const changeItems = (add, remove) => {
-    each(add, item => {
-        createHtml(item).hide().appTo($items).show();
-    });
+    $items[0].appendChild(fragmentOf(add));
 
     each(remove, item => {
         item.$view.hide().rm();

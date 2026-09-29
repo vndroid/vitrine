@@ -3,6 +3,14 @@
 Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version.
 
+## 0.1.7 - 2026-09-29
+
+- faster long folder listings in the details view: rows outside the
+  viewport are skipped by the browser (content-visibility), rows are
+  inserted and sorted in one go; for 5000 entries opening takes ~2.4 s
+  instead of ~3.3 s, sorting ~0.6 s instead of ~1.1 s, relayouts ~75 ms
+  instead of ~290 ms
+
 ## 0.1.6 - 2026-09-29
 
 - update marked from 4.0.10 to 18.0.14 (markdown previews and custom
