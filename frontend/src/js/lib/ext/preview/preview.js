@@ -296,7 +296,11 @@ const init = () => {
 const unsupported = item => {
     const $el = dom(unsupportedTpl);
     $el.find('a').attr('href', item.absHref).attr('download', item.label);
-    global.window.setTimeout(() => event.pub('l10n.refresh'), 0);
+    global.window.setTimeout(() => {
+        event.pub('l10n.refresh');
+        // the translation changes the size, center it again
+        centerContent();
+    }, 0);
     return $el;
 };
 
