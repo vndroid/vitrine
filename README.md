@@ -98,6 +98,35 @@ folder every 2 seconds, `SIGHUP` (`docker kill -s HUP <container>`)
 reloads at once. A file with errors is logged and the previous config
 stays active.
 
+### Admin password
+
+The admin login of the info page is off until `passhash` is set in
+`options.json`. Use a bcrypt hash; `vitrine passwd` asks for the password
+twice (without echo) and prints the hash:
+
+```sh
+vitrine passwd
+# in the Docker image:
+docker run --rm -it --entrypoint vitrine vitrine passwd
+```
+
+Put the printed `$2a$12$...` string into `options.json`:
+
+```json
+{"passhash": "$2a$12$..."}
+```
+
+Then run `vitrine validate -config <dir>` to check it. Notes:
+
+- Passwords are limited to 72 bytes, the limit of bcrypt.
+- The hash is a plain JSON string in `options.json`. Quote it with single
+  quotes if you set it from a shell, it contains `$`.
+- Hashes made by PHP's `password_hash()` (bcrypt, argon2) are accepted
+  too. Unsalted SHA512 hex digests still work but are weak, replace them
+  with a bcrypt hash.
+- After 5 failed logins within 15 minutes a client is locked out for 15
+  minutes; behind a proxy set `-trusted-proxy`, see below.
+
 ## Security
 
 - Only entries of "managed" folders below the root are listed and
