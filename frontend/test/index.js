@@ -12,6 +12,7 @@ const run = async () => {
     await import('./tests/unit/core/event.js');
     await import('./tests/unit/core/format.js');
     await import('./tests/unit/core/store.js');
+    await import('./tests/unit/pre.js');
     await import('./tests/unit/util/naturalCmp.js');
     await import('./tests/unit/util/parsePatten.js');
     await import('./tests/unit/util/sanitizeHtml.js');

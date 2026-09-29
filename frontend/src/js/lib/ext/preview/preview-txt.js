@@ -60,7 +60,7 @@ const load = item => {
             if (style === 1) {
                 return dom(preTpl).text(content);
             } else if (style === 2) {
-                const $div = dom(divTpl).html(sanitizeHtml(marked(content)));
+                const $div = dom(divTpl).html(sanitizeHtml(marked.parse(content)));
                 // lolight only reads the text and builds spans, the sanitized
                 // markup stays untouched
                 $div.find('pre > code').each(el => {

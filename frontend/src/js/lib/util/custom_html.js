@@ -4,7 +4,7 @@ const {sanitizeHtml} = sanitizer;
 
 
 const render_custom_html = (content, type) => {
-    const html = type === 'md' ? marked(content) : content;
+    const html = type === 'md' ? marked.parse(content) : content;
     return sanitizeHtml(html);
 };
 

@@ -3,6 +3,15 @@
 Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version.
 
+## 0.1.6 - 2026-09-29
+
+- update marked from 4.0.10 to 18.0.14 (markdown previews and custom
+  header/footer files); headings no longer get automatic ids
+- polyfill Array/String.prototype.at and Object.hasOwn for browsers
+  without ES2022, the frontend keeps supporting ES2020 browsers
+- the frontend build fails if the bundle (dependencies included) uses
+  built-ins newer than ES2020 that are not polyfilled
+
 ## 0.1.5 - 2026-09-29
 
 - thumbnails for WebP (native), AVIF and HEIC (ImageMagick) images;
