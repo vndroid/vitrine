@@ -26,8 +26,7 @@ func (t *Tree) Search(href, expr string, ignoreCase bool) []*Item {
 	if err != nil {
 		return []*Item{}
 	}
-	root, ok := t.ResolveManagedPath(path)
-	if !ok {
+	if !t.IsManagedPath(path) {
 		return []*Item{}
 	}
 	re, err := pattern.Compile(expr, ignoreCase)
@@ -47,22 +46,24 @@ func (t *Tree) Search(href, expr string, ignoreCase bool) []*Item {
 			s.aborted = true
 			return
 		}
+		// walk the paths below the root (links stay links), but visit every
+		// real folder once, so link cycles end
 		real, ok := t.ResolveManagedPath(dir)
 		if !ok || s.seen[real] {
 			return
 		}
 		s.seen[real] = true
-		for _, name := range t.ReadDir(real) {
+		for _, name := range t.ReadDir(dir) {
 			s.visited++
 			if s.visited > maxSearchVisited || time.Now().After(s.deadline) {
 				s.aborted = true
 				return
 			}
-			p := filepath.Join(real, name)
+			p := filepath.Join(dir, name)
 			if re.MatchString(name) {
 				paths = append(paths, p)
 			}
-			if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+			if fi, err := os.Stat(p); err == nil && fi.IsDir() && !t.isAliasLink(p) {
 				walk(p, depth+1)
 			}
 			if s.aborted {
@@ -70,7 +71,7 @@ func (t *Tree) Search(href, expr string, ignoreCase bool) []*Item {
 			}
 		}
 	}
-	walk(root, 0)
+	walk(path, 0)
 	return t.ItemsForPaths(paths)
 }
 

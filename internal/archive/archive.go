@@ -133,8 +133,8 @@ func (c *collector) addFile(real, archived string) {
 	if c.quotaExceeded() {
 		return
 	}
-	// like h5fs, never follow a link to a file
-	if fi, err := os.Lstat(real); err != nil || fi.Mode()&os.ModeSymlink != 0 {
+	// like h5fs, links to files are only packaged when following symlinks
+	if fi, err := os.Lstat(real); err != nil || fi.Mode()&os.ModeSymlink != 0 && !c.tr.FollowSymlinks() {
 		return
 	}
 	src, ok := c.tr.ResolveManagedFile(real)
@@ -184,11 +184,13 @@ func (c *collector) addDir(real, archived string, depth int) {
 		}
 		c.plan.Entries = append(c.plan.Entries, Entry{Real: resolved, Name: archived, ModTime: mtime, IsDir: true})
 	}
-	for _, name := range c.tr.ReadDir(resolved) {
+	// continue below the path, not the link target, so the rules for
+	// followed links apply to the entries as well
+	for _, name := range c.tr.ReadDir(real) {
 		if c.quotaExceeded() {
 			return
 		}
-		child := filepath.Join(resolved, name)
+		child := filepath.Join(real, name)
 		childName := path.Join(archived, name)
 		if fi, err := os.Stat(child); err == nil && fi.IsDir() {
 			c.addDir(child, childName, depth+1)

@@ -23,6 +23,8 @@ import (
 //	root/file-out -> ../outside/secret.txt
 //	root/link-hidden -> .secret       (visible name, hidden target)
 //	root/link-in -> sub               (folder inside the root)
+//	root/.hl -> sub                   (hidden name)
+//	root/link-cache -> cache          (excluded target)
 func fixture(t *testing.T) (*Tree, string) {
 	t.Helper()
 	base := t.TempDir()
@@ -31,6 +33,8 @@ func fixture(t *testing.T) (*Tree, string) {
 	files := map[string]string{
 		"outside/secret.txt":         "secret",
 		"outside/dir/x.txt":          "x",
+		"outside/dir/.dot":           "d",
+		"outside/dir/sub2/y.txt":     "y",
 		"root/a.txt":                 "aaa",
 		"root/.secret":               "s",
 		"root/my file#1.txt":         "1",
@@ -53,6 +57,8 @@ func fixture(t *testing.T) (*Tree, string) {
 		"root/file-out":    "../outside/secret.txt",
 		"root/link-hidden": ".secret",
 		"root/link-in":     "sub",
+		"root/.hl":         "sub",   // hidden name, visible target
+		"root/link-cache":  "cache", // excluded target
 	}
 	for name, target := range links {
 		if err := os.Symlink(target, filepath.Join(base, name)); err != nil {
@@ -308,5 +314,73 @@ func TestBaseHrefs(t *testing.T) {
 	}
 	if !tr.IsManagedHref("/files/sub/") || tr.IsManagedHref("/sub/") {
 		t.Error("managed hrefs must include the base")
+	}
+}
+
+func TestHiddenLinkName(t *testing.T) {
+	tr, root := fixture(t)
+	if tr.IsManagedHref("/.hl/") {
+		t.Error("a link with a hidden name must not be served")
+	}
+	if _, ok := tr.ResolveManagedFile(filepath.Join(root, ".hl", "b.jpg")); ok {
+		t.Error("files below a hidden link must not be served")
+	}
+}
+
+func TestFollowSymlinks(t *testing.T) {
+	tr, root := fixture(t)
+	tr.SetFollowSymlinks(true)
+
+	for href, want := range map[string]bool{
+		"/link-out/":      true,
+		"/link-out/sub2/": true,
+		"/.hl/":           false, // hidden name
+		"/link-cache/":    false, // excluded target
+	} {
+		if got := tr.IsManagedHref(href); got != want {
+			t.Errorf("IsManagedHref(%s) = %v, want %v", href, got, want)
+		}
+	}
+	for rel, want := range map[string]bool{
+		"file-out":         true,
+		"link-out/x.txt":   true,
+		"link-out/.dot":    false, // hidden in the target
+		"link-hidden":      false, // target inside the root is hidden
+		"link-cache/t.jpg": false, // excluded
+		".hl/b.jpg":        false,
+	} {
+		if _, got := tr.ResolveManagedFile(filepath.Join(root, rel)); got != want {
+			t.Errorf("ResolveManagedFile(%s) = %v, want %v", rel, got, want)
+		}
+	}
+	if got := strings.Join(tr.ReadDir(root), ","); got != "a.txt,cache,file-out,link-hidden,link-in,link-out,my file#1.txt,site,sub" {
+		t.Errorf("ReadDir = %s", got)
+	}
+	if got := strings.Join(tr.ReadDir(filepath.Join(root, "link-out")), ","); got != "sub2,x.txt" {
+		t.Errorf("ReadDir(link-out) = %s", got)
+	}
+
+	var hrefs []string
+	for _, it := range tr.Items("/link-out/", 1) {
+		hrefs = append(hrefs, it.Href)
+	}
+	if !strings.Contains(strings.Join(hrefs, ","), "/link-out/x.txt") {
+		t.Errorf("items = %v", hrefs)
+	}
+	var found []string
+	for _, it := range tr.Search("/", `^[xy]\.txt$`, false) {
+		found = append(found, it.Href)
+	}
+	if strings.Join(found, ",") != "/link-out/sub2/y.txt,/link-out/x.txt" {
+		t.Errorf("search = %v", found)
+	}
+}
+
+func TestLinkedFolderSize(t *testing.T) {
+	tr, _ := fixture(t)
+	for _, it := range tr.Items("/", 1) {
+		if it.Href == "/link-in/" && (it.Size == nil || *it.Size != 15) {
+			t.Errorf("size of a linked folder = %v, want 15", it.Size)
+		}
 	}
 }

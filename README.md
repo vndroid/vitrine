@@ -40,6 +40,7 @@ Then open http://localhost:8080/.
 | `-cache` | `VITRINE_CACHE` | user cache dir | thumbnail cache |
 | `-base-path` | `VITRINE_BASE_PATH` | | URL path to serve below, e.g. `/files` |
 | `-trusted-proxy` | `VITRINE_TRUSTED_PROXY` | | reverse proxies, see below |
+| `-follow-symlinks` | `VITRINE_FOLLOW_SYMLINKS` | `false` | also serve links whose target is outside the root |
 
 `vitrine passwd` prints a password hash for the admin login,
 `vitrine version` the version.
@@ -89,7 +90,10 @@ stays active.
 - Only entries of "managed" folders below the root are listed and
   served. Entries matching `view.hidden` (by default dotfiles and
   `_vitrine*`/`_h5fs*` files) are neither listed nor served.
-- Symbolic links are followed only if their target is inside the root.
+- Symbolic links are followed only if their target is inside the root,
+  unless `-follow-symlinks` is set. The hidden rules always apply to the
+  path below the root and, for targets inside the root, to the target;
+  links to the cache or config folder are never served.
 - Shared HTML, SVG and XML files are served with
   `Content-Security-Policy: sandbox`, PHP files as plain text.
 - The cache and config folders are never served, even inside the root.
@@ -141,7 +145,8 @@ location /files/ {
   rules. Point your proxy at vitrine instead of the h5fs `index.php`.
 - Changes in behavior:
   - hidden entries are no longer downloadable by direct URL;
-  - symbolic links leaving the root are neither listed nor served;
+  - symbolic links leaving the root are neither listed nor served, unless
+    `-follow-symlinks` is set;
   - packages are built by vitrine, no `tar`/`zip` commands are needed;
     `download.type` is now `tar` or `zip`, the h5fs values `php-tar`,
     `shell-tar` and `shell-zip` still work (as does `foldersize.type`

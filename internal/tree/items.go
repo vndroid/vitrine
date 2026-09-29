@@ -234,6 +234,10 @@ func (t *Tree) folderSize(path string) *int64 {
 func walkSize(path string) *int64 {
 	var total int64
 	deadline := time.Now().Add(folderSizeTimeout)
+	// the folder itself may be a link, WalkDir wouldn't descend into it
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
 	err := filepath.WalkDir(path, func(_ string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil

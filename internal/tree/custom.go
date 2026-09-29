@@ -35,10 +35,11 @@ func (t *Tree) Custom(href string) Customizations {
 	if err != nil {
 		return c
 	}
-	dir, ok := t.ResolveManagedPath(path)
-	if !ok {
+	if !t.IsManagedPath(path) {
 		return c
 	}
+	// walk up the paths below the root, not the targets of links
+	dir := path
 
 	t.readCustom(dir, "header", &c.Header)
 	t.readCustom(dir, "footer", &c.Footer)

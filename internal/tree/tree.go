@@ -23,6 +23,7 @@ type Tree struct {
 	excluded []string // resolved paths never managed (cache, config)
 	base     string   // href prefix, "" for the site root
 	baseSegs []string
+	follow   bool // serve symlinks leaving the root
 
 	sizeMu    sync.Mutex
 	sizeCache map[string]sizeEntry
@@ -71,6 +72,14 @@ func (t *Tree) SetBase(base string) error {
 	t.base, t.baseSegs = strings.TrimSuffix(base, "/"), segs
 	return nil
 }
+
+// SetFollowSymlinks allows symbolic links whose target is outside the
+// root. The rules still apply to the path below the root, and to the
+// target if it is inside the root; excluded folders stay excluded.
+func (t *Tree) SetFollowSymlinks(follow bool) { t.follow = follow }
+
+// FollowSymlinks reports whether links leaving the root are followed.
+func (t *Tree) FollowSymlinks() bool { return t.follow }
 
 // Base returns the href prefix, "" for the site root.
 func (t *Tree) Base() string { return t.base }
@@ -158,11 +167,11 @@ func (t *Tree) ReadDir(path string) []string {
 		if hideIf403 && !readable(filepath.Join(path, name)) {
 			continue
 		}
-		// links leaving the root can't be served, don't list them (and the
-		// size and time of their targets) either
+		// links leaving the root can't be served (unless followed), don't
+		// list them (and the size and time of their targets) either
 		if e.Type()&os.ModeSymlink != 0 {
 			real, err := filepath.EvalSymlinks(filepath.Join(path, name))
-			if err != nil || !within(real, t.root) {
+			if err != nil || t.isExcluded(real) || !t.follow && !within(real, t.root) {
 				continue
 			}
 		}
@@ -188,33 +197,63 @@ func (t *Tree) ResolveManagedPath(path string) (string, bool) {
 	return real, true
 }
 
-// resolveDir resolves a folder inside the root that is not excluded and
-// has no hidden ancestor, managed or not.
+// resolveDir resolves a folder that is not excluded and has no hidden
+// ancestor, managed or not. The rules apply to the path below the root
+// the client asked for and to the real target if it is inside the root;
+// targets outside the root are only allowed when following symlinks.
 func (t *Tree) resolveDir(path string) (string, bool) {
 	real, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", false
 	}
 	fi, err := os.Stat(real)
-	if err != nil || !fi.IsDir() || !within(real, t.root) {
+	if err != nil || !fi.IsDir() || t.isExcluded(real) || !t.visiblePath(path) {
 		return "", false
 	}
-	for _, e := range t.excluded {
-		if within(real, e) {
-			return "", false
-		}
+	if !within(real, t.root) {
+		return real, t.follow
 	}
-	for p := real; p != t.root; {
+	if real != path && !t.visiblePath(real) {
+		return "", false
+	}
+	return real, true
+}
+
+// visiblePath reports whether a path is below the root and neither it nor
+// one of its ancestors (below the root) is hidden.
+func (t *Tree) visiblePath(path string) bool {
+	path = filepath.Clean(path)
+	if !within(path, t.root) {
+		return false
+	}
+	for p := path; p != t.root; {
 		parent := filepath.Dir(p)
-		if parent == p {
-			return "", false
-		}
-		if t.isHiddenEntry(parent, filepath.Base(p)) {
-			return "", false
+		if parent == p || t.isHiddenEntry(parent, filepath.Base(p)) {
+			return false
 		}
 		p = parent
 	}
-	return real, true
+	return true
+}
+
+// isAliasLink reports whether path is a link to a folder inside the root,
+// which walks reach under its real path anyway.
+func (t *Tree) isAliasLink(path string) bool {
+	fi, err := os.Lstat(path)
+	if err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		return false
+	}
+	real, err := filepath.EvalSymlinks(path)
+	return err == nil && within(real, t.root)
+}
+
+func (t *Tree) isExcluded(real string) bool {
+	for _, e := range t.excluded {
+		if within(real, e) {
+			return true
+		}
+	}
+	return false
 }
 
 // IsManagedPath reports whether a folder may be listed.
@@ -230,15 +269,22 @@ func (t *Tree) IsManagedHref(href string) bool {
 }
 
 // ResolveManagedFile resolves a file and returns its real path if it may
-// be served: a regular file in a managed folder that is not hidden.
+// be served: a regular file in a managed folder that is not hidden, both
+// for the path the client asked for and, inside the root, for the target.
 func (t *Tree) ResolveManagedFile(path string) (string, bool) {
 	real, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", false
 	}
 	fi, err := os.Stat(real)
-	if err != nil || !fi.Mode().IsRegular() {
+	if err != nil || !fi.Mode().IsRegular() || t.isExcluded(real) {
 		return "", false
+	}
+	if !t.visiblePath(path) || !t.IsManagedPath(filepath.Dir(path)) {
+		return "", false
+	}
+	if !within(real, t.root) {
+		return real, t.follow
 	}
 	parent, ok := t.ResolveManagedPath(filepath.Dir(real))
 	if !ok || t.isHiddenEntry(parent, filepath.Base(real)) {

@@ -38,7 +38,7 @@ func fixture(t *testing.T) *tree.Tree {
 		os.MkdirAll(filepath.Dir(p), 0o755)
 		os.WriteFile(p, []byte(content), 0o644)
 	}
-	os.Symlink("../outside/secret.txt", filepath.Join(root, "dir", "out.txt"))
+	os.Symlink("../../outside/secret.txt", filepath.Join(root, "dir", "out.txt"))
 	os.Symlink("a.txt", filepath.Join(root, "link.txt"))
 	cfg, _ := config.Load("", web.Conf())
 	tr, err := tree.New(root, cfg)
@@ -232,5 +232,20 @@ func TestRateWriter(t *testing.T) {
 	now = now.Add(2 * time.Minute)
 	if _, err := w.Write([]byte("x")); !errors.Is(err, ErrTooSlow) {
 		t.Fatal("max duration")
+	}
+}
+
+func TestCollectFollowSymlinks(t *testing.T) {
+	tr := fixture(t)
+	if _, err := Collect(tr, "/", []string{"/dir/out.txt"}, DefaultLimits); !errors.Is(err, ErrRejected) {
+		t.Error("links leaving the root must be skipped by default")
+	}
+	tr.SetFollowSymlinks(true)
+	p, err := Collect(tr, "/", []string{"/dir/out.txt", "/link.txt"}, DefaultLimits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := names(p); got != "dir/out.txt,link.txt" {
+		t.Errorf("entries = %s", got)
 	}
 }

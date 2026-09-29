@@ -189,8 +189,9 @@ func (s *Server) serveShared(w http.ResponseWriter, r *http.Request, href string
 			redirectSlash(w, r)
 			return
 		}
-		if real, ok := s.tree.ResolveManagedPath(p); ok {
-			s.renderPage(w, r, "index", real)
+		if s.tree.IsManagedPath(p) {
+			// the path below the root, so links keep their hrefs
+			s.renderPage(w, r, "index", p)
 			return
 		}
 		if index, ok := s.tree.ResolveUnmanagedIndex(p); ok {

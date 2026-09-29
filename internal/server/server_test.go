@@ -365,3 +365,17 @@ func TestPartialOptionsKeepDotfilesPrivate(t *testing.T) {
 		t.Error(".secret listed")
 	}
 }
+
+func TestFollowSymlinksServing(t *testing.T) {
+	s, _ := newTestServer(t, fixtureOpts{})
+	if rec := do(s, "GET", "/file-out", "", nil); rec.Code != 404 {
+		t.Fatalf("default: GET /file-out = %d", rec.Code)
+	}
+	s.tree.SetFollowSymlinks(true)
+	if rec := do(s, "GET", "/file-out", "", nil); rec.Code != 200 || rec.Body.String() != "secret" {
+		t.Errorf("follow: GET /file-out = %d %q", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(do(s, "GET", "/", "", nil).Body.String(), `href="/file-out"`) {
+		t.Error("followed link not listed")
+	}
+}

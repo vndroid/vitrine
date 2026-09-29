@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -62,6 +63,7 @@ func run(args []string) error {
 	confDir := fset.String("config", env("CONFIG", ""), "config folder overriding the defaults (options.json, types.json, l10n/, ext/)")
 	cacheDir := fset.String("cache", env("CACHE", defaultCacheDir()), "cache folder for thumbnails")
 	basePath := fset.String("base-path", env("BASE_PATH", ""), "URL path vitrine is served below, e.g. /files (default: the site root)")
+	follow := fset.Bool("follow-symlinks", envBool("FOLLOW_SYMLINKS"), "also serve symbolic links whose target is outside -root (hidden rules still apply)")
 	proxies := fset.String("trusted-proxy", env("TRUSTED_PROXY", ""), "comma separated IPs/CIDRs of reverse proxies whose X-Real-IP, X-Forwarded-For and X-Forwarded-Proto headers are trusted")
 	if err := fset.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -101,6 +103,7 @@ func run(args []string) error {
 	if err := tr.SetBase(base); err != nil {
 		return fmt.Errorf("-base-path %q: %w", *basePath, err)
 	}
+	tr.SetFollowSymlinks(*follow)
 
 	srv := server.New(server.Options{
 		Tree:           tr,
@@ -187,6 +190,11 @@ func passwd() error {
 	}
 	fmt.Println(hash)
 	return nil
+}
+
+func envBool(name string) bool {
+	v, err := strconv.ParseBool(env(name, "false"))
+	return err == nil && v
 }
 
 func env(name, def string) string {
