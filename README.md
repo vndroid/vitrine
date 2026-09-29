@@ -93,6 +93,26 @@ owner may read (0600) are not readable by the other one. To run as
 Arguments are passed to vitrine: flags (`-access-log`) and the commands
 `validate`, `passwd`, `version` and `help` work as in
 `docker run --rm vitrine validate`; any other command is run as it is.
+The image checks its own health, see [Health checks](#health-checks).
+
+### Health checks
+
+Like Prometheus, vitrine answers two public endpoints below the base path.
+They return a fixed text without details, are not written to the access
+log and only accept `GET` and `HEAD`:
+
+| Endpoint | Answers |
+|---|---|
+| `/-/healthy` | `200` as long as vitrine serves requests |
+| `/-/ready` | `200` while the shared folder is accessible, `503` if it is not (e.g. a lost network mount); a check that hangs answers `503` after 2 seconds |
+
+Use `/-/healthy` to decide whether to restart vitrine and `/-/ready` to
+decide whether to send it traffic: a lost mount is no reason to restart.
+Changes of the ready state are logged.
+
+The Docker image has a `HEALTHCHECK` that requests `/-/healthy` every 30
+seconds (the port and path follow `VITRINE_LISTEN` and
+`VITRINE_BASE_PATH`), so `docker ps` shows `healthy` or `unhealthy`.
 
 ## Configuration
 
@@ -128,7 +148,7 @@ twice (without echo) and prints the hash:
 ```sh
 vitrine passwd
 # in the Docker image:
-docker run --rm -it --entrypoint vitrine vitrine passwd
+docker run --rm -it vitrine passwd
 ```
 
 Put the printed `$2a$12$...` string into `options.json`:

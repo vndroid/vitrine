@@ -4,6 +4,16 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.3 - 2026-09-29
+
+- health endpoints like the ones of Prometheus: `/-/healthy` answers 200
+  while vitrine serves requests, `/-/ready` answers 200 while the shared
+  folder is accessible and 503 otherwise (a check that blocks, e.g. a
+  lost network mount, answers 503 after 2 seconds). Both are public, carry
+  no details and are not written to the access log
+- Docker image: `HEALTHCHECK` on `/-/healthy`, following `VITRINE_LISTEN`
+  and `VITRINE_BASE_PATH`
+
 ## 0.4.2 - 2026-09-29
 
 - Docker image: an entrypoint passes flags and the commands `validate`,

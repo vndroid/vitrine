@@ -7,10 +7,15 @@ import (
 	"time"
 )
 
-// AccessLog logs every request of next: the client (after trusted
+// AccessLog logs every request of next, except the health probes: the client (after trusted
 // proxies), method, path, status, bytes sent, duration and user agent.
 func (s *Server) AccessLog(next http.Handler, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// health probes come every few seconds: not logged
+		if s.isProbe(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		start := time.Now()
 		rec := &recorder{ResponseWriter: w}
 		defer func() {

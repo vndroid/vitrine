@@ -31,6 +31,15 @@ import (
 // AdminPath is the admin page, below the base path.
 const AdminPath = "/-/admin"
 
+// Health endpoints, below the base path, like the ones of Prometheus:
+// HealthyPath answers 200 while vitrine serves requests, ReadyPath only
+// while the shared folder is accessible (503 otherwise). Both are public,
+// carry no details and are left out of the access log.
+const (
+	HealthyPath = "/-/healthy"
+	ReadyPath   = "/-/ready"
+)
+
 // URL prefixes of the frontend and thumbnails, below the base path; the
 // frontend reads the public href from the setup.
 const (
@@ -66,9 +75,14 @@ type Server struct {
 	trusted  []netip.Prefix
 	log      *slog.Logger
 	commands atomic.Pointer[map[string]bool]
-	sessions *auth.Sessions
-	throttle *auth.Throttle
-	slots    *archive.Slots
+	// rootCheck tests that the shared folder is accessible; readyBusy is
+	// set while a check runs, readyState remembers the last answer
+	rootCheck  func() error
+	readyBusy  atomic.Bool
+	readyState atomic.Int32
+	sessions   *auth.Sessions
+	throttle   *auth.Throttle
+	slots      *archive.Slots
 	// thumbCalls limits concurrent thumbnail requests
 	thumbCalls *archive.Slots
 	thumb      *thumb.Service
@@ -177,14 +191,28 @@ func isReservedName(rel string) bool {
 	return err == nil && name == tree.ReservedName
 }
 
-// serveBuiltin serves the pages below the reserved name: the admin page.
+// serveBuiltin serves the pages below the reserved name: the admin page
+// and the health endpoints.
 func (s *Server) serveBuiltin(w http.ResponseWriter, r *http.Request, rel string) {
 	name, err := unescape(rel)
-	if err != nil || name != AdminPath && name != AdminPath+"/" {
+	if err != nil {
 		s.notFound(w)
 		return
 	}
-	s.renderPage(w, r, "info", "")
+	switch name {
+	case AdminPath, AdminPath + "/":
+		s.renderPage(w, r, "info", "")
+	case HealthyPath:
+		s.probe(w, r, http.StatusOK, "vitrine is healthy.\n")
+	case ReadyPath:
+		if s.isReady() {
+			s.probe(w, r, http.StatusOK, "vitrine is ready.\n")
+		} else {
+			s.probe(w, r, http.StatusServiceUnavailable, "vitrine is not ready.\n")
+		}
+	default:
+		s.notFound(w)
+	}
 }
 
 // serveReserved serves the frontend and thumbnails.

@@ -11,7 +11,7 @@ import (
 // Version of vitrine, raised with every change worth a version (see
 // CHANGELOG.md): patch for small features and fixes, minor for larger
 // ones. Releases are tagged by hand.
-const Version = "0.4.2"
+const Version = "0.4.3"
 
 // Build information, set with -ldflags "-X main.<name>=...". Revision and
 // tags fall back to what the Go toolchain records in the binary.
