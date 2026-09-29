@@ -48,7 +48,7 @@ build information:
 
 ```
 vitrine, version 0.2.1 (branch: main, revision: 74661efee79c35ce052924b00690e45d363e4913)
-  Date: 2026-09-29T08:00:24Z
+  Built: 2026-09-29T08:00:24Z
   Platform: linux/amd64
   Runtime: go1.26.1
   Tags: netgo

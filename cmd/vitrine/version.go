@@ -32,7 +32,7 @@ func buildVersion() string {
 
 // buildInfo is what "vitrine --version" prints.
 type buildInfo struct {
-	Version, Branch, Revision, Date, Platform, Runtime, Tags string
+	Version, Branch, Revision, Built, Platform, Runtime, Tags string
 }
 
 func currentBuild() buildInfo {
@@ -40,7 +40,7 @@ func currentBuild() buildInfo {
 		Version:  buildVersion(),
 		Branch:   branch,
 		Revision: revision,
-		Date:     buildDate,
+		Built:    buildDate,
 		Platform: runtime.GOOS + "/" + runtime.GOARCH,
 		Runtime:  runtime.Version(),
 	}
@@ -56,7 +56,7 @@ func currentBuild() buildInfo {
 			}
 		}
 	}
-	for _, v := range []*string{&b.Branch, &b.Revision, &b.Date} {
+	for _, v := range []*string{&b.Branch, &b.Revision, &b.Built} {
 		if *v == "" {
 			*v = "unknown"
 		}
@@ -89,7 +89,7 @@ func (b buildInfo) format(colored bool) string {
 	var sb strings.Builder
 	sb.WriteString(head + "\n")
 	for _, f := range [...][2]string{
-		{"Date", b.Date},
+		{"Built", b.Built},
 		{"Platform", b.Platform},
 		{"Runtime", b.Runtime},
 		{"Tags", b.Tags},
