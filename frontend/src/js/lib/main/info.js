@@ -50,8 +50,13 @@ const addTests = () => {
     );
 
     addTest(
-        'Runtime', 'Go runtime and platform',
-        true, setup.GO_VERSION + ' ' + setup.PLATFORM
+        'Runtime', 'Go version vitrine was built with',
+        true, setup.GO_VERSION
+    );
+
+    addTest(
+        'Platform', 'Operating system and architecture',
+        true, setup.PLATFORM
     );
 
     addTest(

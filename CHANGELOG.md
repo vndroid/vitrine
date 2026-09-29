@@ -3,6 +3,10 @@
 Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version.
 
+## 0.1.10 - 2026-09-29
+
+- info page: show the Go runtime and the platform as separate checks
+
 ## 0.1.9 - 2026-09-29
 
 - limit thumbnail requests: 2 in progress per client and 16 in total,
