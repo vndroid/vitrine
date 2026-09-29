@@ -42,5 +42,10 @@ EXPOSE 8080
 VOLUME ["/cache"]
 WORKDIR /share
 
+# "docker ps" shows the state; the address follows VITRINE_LISTEN and
+# VITRINE_BASE_PATH (wget of busybox, no other tool needed)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -q --spider "http://127.0.0.1:${VITRINE_LISTEN##*:}${VITRINE_BASE_PATH%/}/-/healthy" || exit 1
+
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["vitrine"]

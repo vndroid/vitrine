@@ -55,3 +55,15 @@ jobs:
       - uses: actions/checkout@v7
       - run: docker build -t vitrine:ci --build-arg REVISION=${{ github.sha }} --build-arg BRANCH=${{ github.ref_name }} .
       - run: docker run --rm vitrine:ci --version
+      - name: Container becomes healthy
+        run: |
+          docker run -d --name vitrine-ci --health-interval=2s --health-start-period=1s \
+            -v "$PWD/web:/share:ro" vitrine:ci
+          for i in $(seq 1 30); do
+            state=$(docker inspect -f '{{.State.Health.Status}}' vitrine-ci)
+            echo "health: $state"
+            [ "$state" = healthy ] && exit 0
+            sleep 2
+          done
+          docker logs vitrine-ci
+          exit 1
