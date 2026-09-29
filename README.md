@@ -38,6 +38,7 @@ Then open http://localhost:8080/.
 | `-listen` | `VITRINE_LISTEN` | `:8080` | listen address |
 | `-config` | `VITRINE_CONFIG` | | config folder, see below |
 | `-cache` | `VITRINE_CACHE` | user cache dir | thumbnail cache |
+| `-base-path` | `VITRINE_BASE_PATH` | | URL path to serve below, e.g. `/files` |
 | `-trusted-proxy` | `VITRINE_TRUSTED_PROXY` | | reverse proxies, see below |
 
 `vitrine passwd` prints a password hash for the admin login,
@@ -117,6 +118,16 @@ location / {
 
 Don't compress video and other binary responses in the proxy, it breaks
 Range requests.
+
+To serve vitrine below a path of an existing site, start it with
+`-base-path /files` and pass the path on unchanged:
+
+```nginx
+location /files/ {
+    proxy_pass http://127.0.0.1:8080;   # no URI part: keep /files/
+    # proxy_set_header ... as above
+}
+```
 
 ## Migrating from h5fs
 

@@ -61,6 +61,7 @@ func run(args []string) error {
 	listen := fset.String("listen", env("LISTEN", ":8080"), "address to listen on")
 	confDir := fset.String("config", env("CONFIG", ""), "config folder overriding the defaults (options.json, types.json, l10n/, ext/)")
 	cacheDir := fset.String("cache", env("CACHE", defaultCacheDir()), "cache folder for thumbnails")
+	basePath := fset.String("base-path", env("BASE_PATH", ""), "URL path vitrine is served below, e.g. /files (default: the site root)")
 	proxies := fset.String("trusted-proxy", env("TRUSTED_PROXY", ""), "comma separated IPs/CIDRs of reverse proxies whose X-Real-IP, X-Forwarded-For and X-Forwarded-Proto headers are trusted")
 	if err := fset.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -92,6 +93,13 @@ func run(args []string) error {
 	tr, err := tree.New(*root, cfg, *cacheDir, *confDir)
 	if err != nil {
 		return err
+	}
+	base, err := tree.NormalizeBase(*basePath)
+	if err != nil {
+		return fmt.Errorf("-base-path %q: %w", *basePath, err)
+	}
+	if err := tr.SetBase(base); err != nil {
+		return fmt.Errorf("-base-path %q: %w", *basePath, err)
 	}
 
 	srv := server.New(server.Options{
@@ -131,7 +139,7 @@ func run(args []string) error {
 	}()
 	errc := make(chan error, 1)
 	go func() {
-		log.Info("vitrine started", "version", buildVersion(), "listen", *listen, "root", tr.Root())
+		log.Info("vitrine started", "version", buildVersion(), "listen", *listen, "root", tr.Root(), "base", base+"/")
 		errc <- httpSrv.ListenAndServe()
 	}()
 	select {

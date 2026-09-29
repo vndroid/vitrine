@@ -19,6 +19,7 @@ import (
 type fixtureOpts struct {
 	options string // options.json override, empty for the defaults
 	trusted string
+	base    string // --base-path
 }
 
 func newTestServer(t *testing.T, o fixtureOpts) (*Server, string) {
@@ -58,6 +59,13 @@ func newTestServer(t *testing.T, o fixtureOpts) (*Server, string) {
 	tr, err := tree.New(root, cfg, cache)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if o.base != "" {
+		base, err := tree.NormalizeBase(o.base)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tr.SetBase(base)
 	}
 	trusted, err := ParseTrustedProxies(o.trusted)
 	if err != nil {

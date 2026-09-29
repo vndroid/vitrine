@@ -270,3 +270,43 @@ func TestCustom(t *testing.T) {
 		t.Error("root has no footer")
 	}
 }
+
+func TestNormalizeBase(t *testing.T) {
+	for in, want := range map[string]string{
+		"": "", "/": "", "files": "/files", "/files/": "/files", "//a//b/": "/a/b", "/my files": "/my%20files",
+	} {
+		if got, err := NormalizeBase(in); err != nil || got != want {
+			t.Errorf("NormalizeBase(%q) = %q, %v, want %q", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"/..", "/a/./b", "/a?b", "/a#b", "/a\\b"} {
+		if _, err := NormalizeBase(in); err == nil {
+			t.Errorf("NormalizeBase(%q) should fail", in)
+		}
+	}
+}
+
+func TestBaseHrefs(t *testing.T) {
+	tr, root := fixture(t)
+	tr.SetBase("/files")
+	if h, _ := tr.ToHref(filepath.Join(root, "sub"), true); h != "/files/sub/" {
+		t.Errorf("ToHref = %s", h)
+	}
+	if h, _ := tr.ToHref(root, true); h != "/files/" {
+		t.Errorf("root href = %s", h)
+	}
+	if p, err := tr.ToPath("/files/sub/b.jpg"); err != nil || p != filepath.Join(root, "sub", "b.jpg") {
+		t.Errorf("ToPath = %s %v", p, err)
+	}
+	if p, err := tr.ToPath("/files"); err != nil || p != root {
+		t.Errorf("ToPath(base) = %s %v", p, err)
+	}
+	for _, href := range []string{"/sub/b.jpg", "/filesX/sub", "/"} {
+		if _, err := tr.ToPath(href); err == nil {
+			t.Errorf("ToPath(%s) outside the base must fail", href)
+		}
+	}
+	if !tr.IsManagedHref("/files/sub/") || tr.IsManagedHref("/sub/") {
+		t.Error("managed hrefs must include the base")
+	}
+}

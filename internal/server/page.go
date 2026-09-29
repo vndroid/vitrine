@@ -49,7 +49,7 @@ func (s *Server) isFallbackMode(r *http.Request) bool {
 func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, module, dir string) {
 	data := pageData{
 		Module:     module,
-		PublicHref: PublicHref,
+		PublicHref: s.publicHref(),
 		Version:    s.version,
 		Homepage:   homepage,
 		HeadTags:   s.headTags(),
@@ -94,7 +94,7 @@ func (s *Server) fallbackHTML(dir string) template.HTML {
 		Images    string
 		HasParent bool
 		Rows      []fallbackRow
-	}{PublicHref + "images/fallback/", hasParent, rows})
+	}{s.publicHref() + "images/fallback/", hasParent, rows})
 	if err != nil {
 		s.log.Error("render fallback", "err", err)
 	}
@@ -106,10 +106,10 @@ func (s *Server) fallbackHTML(dir string) template.HTML {
 func (s *Server) headTags() template.HTML {
 	var b strings.Builder
 	for _, href := range s.cfg.Strings("resources.styles") {
-		b.WriteString(`<link rel="stylesheet" href="` + html.EscapeString(extHref(href)) + `" class="x-head">`)
+		b.WriteString(`<link rel="stylesheet" href="` + html.EscapeString(s.extHref(href)) + `" class="x-head">`)
 	}
 	for _, href := range s.cfg.Strings("resources.scripts") {
-		b.WriteString(`<script src="` + html.EscapeString(extHref(href)) + `" class="x-head"></script>`)
+		b.WriteString(`<script src="` + html.EscapeString(s.extHref(href)) + `" class="x-head"></script>`)
 	}
 	b.WriteString(`<style class="x-head">`)
 	if fonts := s.cfg.Strings("view.fonts"); len(fonts) > 0 {
@@ -124,11 +124,11 @@ func (s *Server) headTags() template.HTML {
 
 var absHrefRe = regexp.MustCompile(`(?i)^(https?://|/)`)
 
-func extHref(href string) string {
+func (s *Server) extHref(href string) string {
 	if absHrefRe.MatchString(href) {
 		return href
 	}
-	return PublicHref + "ext/" + href
+	return s.publicHref() + "ext/" + href
 }
 
 // fontList quotes font names for CSS, dropping characters that could end

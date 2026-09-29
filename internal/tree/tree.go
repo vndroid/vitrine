@@ -21,6 +21,8 @@ type Tree struct {
 	root     string // absolute, symlinks resolved
 	cfg      *config.Config
 	excluded []string // resolved paths never managed (cache, config)
+	base     string   // href prefix, "" for the site root
+	baseSegs []string
 
 	sizeMu    sync.Mutex
 	sizeCache map[string]sizeEntry
@@ -60,19 +62,40 @@ func New(root string, cfg *config.Config, excluded ...string) (*Tree, error) {
 	return t, nil
 }
 
+// SetBase serves the tree below an href prefix (see NormalizeBase).
+func (t *Tree) SetBase(base string) error {
+	segs, err := splitHref(base + "/")
+	if err != nil {
+		return err
+	}
+	t.base, t.baseSegs = strings.TrimSuffix(base, "/"), segs
+	return nil
+}
+
+// Base returns the href prefix, "" for the site root.
+func (t *Tree) Base() string { return t.base }
+
 // Root returns the resolved root directory.
 func (t *Tree) Root() string { return t.root }
 
 // Config returns the configuration.
 func (t *Tree) Config() *config.Config { return t.cfg }
 
-// ToPath maps an absolute href to a path below the root.
+// ToPath maps an absolute href (below the base) to a path below the root.
 func (t *Tree) ToPath(href string) (string, error) {
 	segs, err := splitHref(href)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(append([]string{t.root}, segs...)...), nil
+	if len(segs) < len(t.baseSegs) {
+		return "", ErrBadHref
+	}
+	for i, b := range t.baseSegs {
+		if segs[i] != b {
+			return "", ErrBadHref
+		}
+	}
+	return filepath.Join(append([]string{t.root}, segs[len(t.baseSegs):]...)...), nil
 }
 
 // ToHref maps a path below the root (textually) to its href.
@@ -81,7 +104,7 @@ func (t *Tree) ToHref(path string, trailingSlash bool) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return joinHref(rel, trailingSlash), true
+	return t.base + joinHref(rel, trailingSlash), true
 }
 
 // rel returns the path segments of path below base.

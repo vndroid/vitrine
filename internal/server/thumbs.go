@@ -33,7 +33,7 @@ func (s *Server) thumbs(reqs []any) []*string {
 			continue
 		}
 		if name, ok := s.thumb.Thumb(typ, href, width, height); ok {
-			h := ThumbsHref + name
+			h := s.thumbsHref() + name
 			out[i] = &h
 		}
 	}

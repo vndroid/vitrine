@@ -64,3 +64,23 @@ func joinHref(segs []string, trailingSlash bool) string {
 	}
 	return b.String()
 }
+
+// NormalizeBase turns a base path ("files/", "/my files") into the href
+// prefix the tree is served below ("/files", "/my%20files"); "" and "/"
+// mean the site root.
+func NormalizeBase(base string) (string, error) {
+	var segs []string
+	for _, seg := range strings.Split(base, "/") {
+		switch {
+		case seg == "":
+		case seg == "." || seg == ".." || strings.ContainsAny(seg, "\\\x00?#"):
+			return "", ErrBadHref
+		default:
+			segs = append(segs, seg)
+		}
+	}
+	if len(segs) == 0 {
+		return "", nil
+	}
+	return joinHref(segs, false), nil
+}

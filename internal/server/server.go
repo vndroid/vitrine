@@ -23,8 +23,8 @@ import (
 	"github.com/vndroid/vitrine/internal/tree"
 )
 
-// URL prefixes reserved by vitrine; the frontend reads PublicHref from the
-// setup, so it works unchanged with the h5fs layout below it.
+// URL prefixes reserved by vitrine, below the base path (--base-path); the
+// frontend reads the public href from the setup.
 const (
 	ReservedPrefix = "/_vitrine/"
 	PublicHref     = "/_vitrine/public/"
@@ -99,6 +99,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	if r.Method == http.MethodPost {
+		if _, ok := s.relToBase(r.URL.EscapedPath()); !ok {
+			s.notFound(w)
+			return
+		}
 		s.handleAPI(w, r)
 		return
 	}
@@ -109,12 +113,38 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	href := r.URL.EscapedPath()
-	if rest, ok := strings.CutPrefix(href, ReservedPrefix); ok {
+	rel, ok := s.relToBase(href)
+	if !ok {
+		if href == s.tree.Base() {
+			redirectSlash(w, r)
+		} else {
+			s.notFound(w)
+		}
+		return
+	}
+	if rest, ok := strings.CutPrefix(rel, ReservedPrefix); ok {
 		s.serveReserved(w, r, rest)
 		return
 	}
 	s.serveShared(w, r, href)
 }
+
+// relToBase strips the base path, which every request has to start with.
+func (s *Server) relToBase(href string) (string, bool) {
+	base := s.tree.Base()
+	if base == "" {
+		return href, true
+	}
+	rest, ok := strings.CutPrefix(href, base)
+	if !ok || !strings.HasPrefix(rest, "/") {
+		return "", false
+	}
+	return rest, true
+}
+
+func (s *Server) publicHref() string { return s.tree.Base() + PublicHref }
+
+func (s *Server) thumbsHref() string { return s.tree.Base() + ThumbsHref }
 
 // serveReserved serves the frontend, the info page and thumbnails.
 func (s *Server) serveReserved(w http.ResponseWriter, r *http.Request, rest string) {
@@ -225,8 +255,8 @@ func (s *Server) hasCommand(name string) bool {
 func (s *Server) setupInfo(admin bool) map[string]any {
 	setup := map[string]any{
 		"AS_ADMIN":    admin,
-		"PUBLIC_HREF": PublicHref,
-		"ROOT_HREF":   "/",
+		"PUBLIC_HREF": s.publicHref(),
+		"ROOT_HREF":   s.tree.Base() + "/",
 	}
 	if !admin {
 		return setup
