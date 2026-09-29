@@ -29,15 +29,13 @@ import (
 // configWatchInterval is how often the config folder is checked.
 const configWatchInterval = 2 * time.Second
 
-// version overrides Version at build time: -ldflags "-X main.version=...".
-var version = ""
-
 func main() {
+	if isVersionFlag(os.Args[1:]) {
+		fmt.Print(currentBuild().format(colorEnabled(os.Stdout)))
+		return
+	}
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "version":
-			fmt.Println(buildVersion())
-			return
 		case "validate":
 			os.Exit(validateCmd(os.Args[2:]))
 		case "passwd":
@@ -57,7 +55,7 @@ func main() {
 func run(args []string) error {
 	fset := flag.NewFlagSet("vitrine", flag.ContinueOnError)
 	fset.Usage = func() {
-		fmt.Fprintf(fset.Output(), "Usage: vitrine [flags]\n       vitrine validate [-config dir] [-strict]   check a config folder\n       vitrine passwd   print a password hash for the \"passhash\" option\n       vitrine version\n\nFlags (also settable as VITRINE_<NAME> environment variables):\n")
+		fmt.Fprintf(fset.Output(), "Usage: vitrine [flags]\n       vitrine validate [-config dir] [-strict]   check a config folder\n       vitrine passwd   print a password hash for the \"passhash\" option\n       vitrine -v, --version   print the version and build information\n\nFlags (also settable as VITRINE_<NAME> environment variables):\n")
 		fset.PrintDefaults()
 	}
 	root := fset.String("root", env("ROOT", ""), "folder to share (required)")
@@ -232,12 +230,4 @@ func defaultCacheDir() string {
 		return ""
 	}
 	return filepath.Join(dir, "vitrine")
-}
-
-// buildVersion returns the version, without the "v" of a git tag.
-func buildVersion() string {
-	if version != "" {
-		return strings.TrimPrefix(version, "v")
-	}
-	return Version
 }

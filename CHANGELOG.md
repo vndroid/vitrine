@@ -4,6 +4,14 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.2.1 - 2026-09-29
+
+- `vitrine -v` / `--version` prints the version with branch, revision,
+  build date, platform, Go runtime and build tags; labels are gray on
+  a terminal (`NO_COLOR` turns colors off)
+- the Docker image records the build date and takes the commit as
+  `REVISION` and `BRANCH` build arguments
+
 ## 0.2.0 - 2026-09-29
 
 - `vitrine validate [-config dir] [-strict]` checks a config folder:

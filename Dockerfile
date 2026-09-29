@@ -5,8 +5,13 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-ARG VERSION=""
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/vitrine ./cmd/vitrine
+# .git is not in the build context, pass the commit:
+#   --build-arg REVISION=$(git rev-parse HEAD) --build-arg BRANCH=$(git branch --show-current)
+ARG VERSION="" REVISION="" BRANCH=""
+RUN CGO_ENABLED=0 go build -trimpath -tags netgo -ldflags "-s -w \
+      -X main.version=${VERSION} -X main.revision=${REVISION} -X main.branch=${BRANCH} \
+      -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    -o /out/vitrine ./cmd/vitrine
 
 FROM alpine:3
 # ffmpeg: video thumbnails; imagemagick + ghostscript: pdf/ps thumbnails,

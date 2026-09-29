@@ -53,4 +53,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t vitrine:ci .
+      - run: docker build -t vitrine:ci --build-arg REVISION=${{ github.sha }} --build-arg BRANCH=${{ github.ref_name }} .
+      - run: docker run --rm vitrine:ci --version

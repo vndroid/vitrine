@@ -47,8 +47,20 @@ Then open http://localhost:8080/.
 
 `vitrine validate -config <dir>` checks a config folder (exit code 1 on
 errors, `-strict` also on warnings), `vitrine passwd` prints a password
-hash for the admin login,
-`vitrine version` the version.
+hash for the admin login, `vitrine -v` (or `--version`) the version and
+build information:
+
+```
+vitrine, version 0.2.1 (branch: main, revision: 74661efee79c35ce052924b00690e45d363e4913)
+  Date: 2026-09-29T08:00:24Z
+  Platform: linux/amd64
+  Runtime: go1.26.1
+  Tags: netgo
+```
+
+Build information is set with `-ldflags "-X main.revision=... -X
+main.branch=... -X main.buildDate=..."`; without it, `go build` in a git
+checkout still records the revision.
 
 ### Docker
 
