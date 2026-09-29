@@ -12,6 +12,8 @@ const settings = Object.assign({
     enabled: false,
     styles: {}
 }, allsettings['preview-txt']);
+// larger code blocks are shown without highlighting
+const maxHighlightLength = 50000;
 const preTpl = '<pre id="pv-content-txt"></pre>';
 const divTpl = '<div id="pv-content-txt"></div>';
 
@@ -58,7 +60,15 @@ const load = item => {
             if (style === 1) {
                 return dom(preTpl).text(content);
             } else if (style === 2) {
-                return dom(divTpl).html(sanitizeHtml(marked(content)));
+                const $div = dom(divTpl).html(sanitizeHtml(marked(content)));
+                // lolight only reads the text and builds spans, the sanitized
+                // markup stays untouched
+                $div.find('pre > code').each(el => {
+                    if (el.textContent.length <= maxHighlightLength) {
+                        lolight.el(el);
+                    }
+                });
+                return $div;
             } else if (style === 3) {
                 const $code = dom('<code></code>').text(content);
                 win.setTimeout(() => {

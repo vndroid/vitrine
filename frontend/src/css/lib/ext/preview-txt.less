@@ -37,7 +37,16 @@ div#pv-content-txt {
     padding: 8px 24px;
     overflow-wrap: normal;
 
-    code {
+    // inline code; code blocks are highlighted like source files
+    :not(pre) > code {
         color: #008200;
+    }
+
+    pre {
+        padding: 8px 12px;
+        overflow-x: auto;
+        background: #f6f8fa;
+        border-radius: 4px;
+        line-height: 1.3em;
     }
 }
