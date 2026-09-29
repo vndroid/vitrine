@@ -24,6 +24,31 @@ jobs:
       - run: go test -race ./...
       - run: CGO_ENABLED=0 go build ./cmd/vitrine
 
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Committed build output is up to date
+        working-directory: .
+        run: |
+          if [ -n "$(git status --porcelain -- web/public)" ]; then
+            git status --short -- web/public
+            echo "web/public differs from the frontend sources, run 'npm run build' in frontend/ and commit it"
+            exit 1
+          fi
+
   docker:
     runs-on: ubuntu-latest
     steps:

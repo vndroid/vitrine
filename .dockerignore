@@ -10,3 +10,4 @@
 *.local.json
 .env
 .env.*
+/frontend/node_modules

@@ -1,4 +1,4 @@
-/* h5fs v0.30.0+056~717d880 - https://larsjung.de/h5ai/ */
+/* vitrine frontend v0.1.0 - https://github.com/vndroid/vitrine */
 
 
 /* eslint-disable func-names,no-var */

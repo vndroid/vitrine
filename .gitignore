@@ -21,3 +21,6 @@ coverage.*
 .idea/
 .vscode/
 *.swp
+
+# frontend dependencies
+/frontend/node_modules/

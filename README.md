@@ -138,7 +138,15 @@ go test -race ./...
 go run ./cmd/vitrine -root .
 ```
 
-The bundled frontend lives in [`web/public`](web) (h5fs build output).
+The frontend sources are in [`frontend/`](frontend) (Node.js 24.18+). The
+build output in `web/public` is committed, so rebuild it after changes:
+
+```sh
+cd frontend
+npm ci
+npm run lint && npm test
+npm run build   # writes ../web/public
+```
 
 ## License
 
