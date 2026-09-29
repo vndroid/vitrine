@@ -3,6 +3,13 @@
 Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version.
 
+## 0.1.8 - 2026-09-29
+
+- `-access-log` logs every request with the real client address (after
+  trusted proxies), status, bytes, duration and user agent; aborted
+  downloads are marked
+- `-log-format json` for structured logs
+
 ## 0.1.7 - 2026-09-29
 
 - faster long folder listings in the details view: rows outside the

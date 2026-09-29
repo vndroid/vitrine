@@ -64,6 +64,8 @@ func run(args []string) error {
 	cacheDir := fset.String("cache", env("CACHE", defaultCacheDir()), "cache folder for thumbnails")
 	basePath := fset.String("base-path", env("BASE_PATH", ""), "URL path vitrine is served below, e.g. /files (default: the site root)")
 	follow := fset.Bool("follow-symlinks", envBool("FOLLOW_SYMLINKS"), "also serve symbolic links whose target is outside -root (hidden rules still apply)")
+	accessLog := fset.Bool("access-log", envBool("ACCESS_LOG"), "log every request (client, method, path, status, bytes, duration)")
+	logFormat := fset.String("log-format", env("LOG_FORMAT", "text"), `log format, "text" or "json"`)
 	proxies := fset.String("trusted-proxy", env("TRUSTED_PROXY", ""), "comma separated IPs/CIDRs of reverse proxies whose X-Real-IP, X-Forwarded-For and X-Forwarded-Proto headers are trusted")
 	if err := fset.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -76,7 +78,15 @@ func run(args []string) error {
 		return errors.New("-root is required")
 	}
 
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	var log *slog.Logger
+	switch *logFormat {
+	case "text":
+		log = slog.New(slog.NewTextHandler(os.Stderr, nil))
+	case "json":
+		log = slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	default:
+		return fmt.Errorf("-log-format %q: use text or json", *logFormat)
+	}
 	slog.SetDefault(log)
 
 	cfg, err := config.Load(*confDir, web.Conf())
@@ -115,9 +125,13 @@ func run(args []string) error {
 		TrustedProxies: trusted,
 		Logger:         log,
 	})
+	var handler http.Handler = srv
+	if *accessLog {
+		handler = srv.AccessLog(srv, log)
+	}
 	httpSrv := &http.Server{
 		Addr:              *listen,
-		Handler:           srv,
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 		// no WriteTimeout: downloads may take long, archives enforce limits

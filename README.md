@@ -42,6 +42,8 @@ Then open http://localhost:8080/.
 | `-base-path` | `VITRINE_BASE_PATH` | | URL path to serve below, e.g. `/files` |
 | `-trusted-proxy` | `VITRINE_TRUSTED_PROXY` | | reverse proxies, see below |
 | `-follow-symlinks` | `VITRINE_FOLLOW_SYMLINKS` | `false` | also serve links whose target is outside the root |
+| `-access-log` | `VITRINE_ACCESS_LOG` | `false` | log every request (client, method, path, status, bytes, duration) |
+| `-log-format` | `VITRINE_LOG_FORMAT` | `text` | `text` or `json` |
 
 `vitrine passwd` prints a password hash for the admin login,
 `vitrine version` the version.
