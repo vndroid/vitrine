@@ -192,6 +192,31 @@ func TestFramingHeaders(t *testing.T) {
 	}
 }
 
+func TestPoweredBy(t *testing.T) {
+	s, _ := newTestServer(t, fixtureOpts{})
+	const want = "vitrine/test"
+	for _, target := range []string{"/", "/a.txt", "/nope", "/sub", "/-/admin", "/-/healthy", "/_vitrine/public/js/scripts.js"} {
+		if got := do(s, "GET", target, "", nil).Header().Get("X-Powered-By"); got != want {
+			t.Errorf("GET %s: X-Powered-By = %q, want %q", target, got, want)
+		}
+	}
+	rec := do(s, "POST", "/", `{"action":"get"}`, map[string]string{"Content-Type": "application/json"})
+	if got := rec.Header().Get("X-Powered-By"); got != want {
+		t.Errorf("API: X-Powered-By = %q", got)
+	}
+	if got := do(s, "PUT", "/a.txt", "", nil).Header().Get("X-Powered-By"); got != want {
+		t.Errorf("405: X-Powered-By = %q", got)
+	}
+}
+
+func TestPoweredByFollowsTheVersion(t *testing.T) {
+	for version, want := range map[string]string{"0.4.3": "vitrine/0.4.3", "1.0.0-rc1": "vitrine/1.0.0-rc1", "": "vitrine"} {
+		if got := poweredBy(version); got != want {
+			t.Errorf("poweredBy(%q) = %q, want %q", version, got, want)
+		}
+	}
+}
+
 func TestRedirects(t *testing.T) {
 	s, _ := newTestServer(t, fixtureOpts{})
 	for target, want := range map[string]string{

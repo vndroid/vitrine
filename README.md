@@ -185,6 +185,10 @@ Then run `vitrine validate -config <dir>` to check it. Notes:
 - Shared HTML, SVG and XML files are served with
   `Content-Security-Policy: sandbox`, PHP files as plain text.
 - The cache and config folders are never served, even inside the root.
+- Every response carries `X-Powered-By: vitrine/<version>`, with the
+  version of the program. It tells the world which version runs; see
+  [Hiding the X-Powered-By header](#hiding-the-x-powered-by-header) to
+  remove it in the reverse proxy.
 
 ### Behind a reverse proxy
 
@@ -257,6 +261,35 @@ example.com {
 
 If Caddy itself is behind another proxy or a CDN, list those in Caddy's
 `trusted_proxies` server option, so `{client_ip}` is the visitor.
+
+#### Hiding the X-Powered-By header
+
+vitrine sends `X-Powered-By: vitrine/<version>` (the running version) on every
+response. It is handy for debugging, but it also shows which version to
+attack, so a public site may want to drop it in the proxy in front:
+
+nginx, in the `location` (or `server`) that has the `proxy_pass`:
+
+```nginx
+proxy_hide_header X-Powered-By;
+```
+
+Caddy, inside `reverse_proxy` (`header_down` changes the response of the
+upstream):
+
+```caddy
+files.example.com {
+    reverse_proxy 127.0.0.1:8080 {
+        header_up X-Real-IP {client_ip}
+        header_down -X-Powered-By
+    }
+}
+```
+
+Check it with `curl -sI https://files.example.com/ | grep -i powered`,
+which should print nothing. Behind a CDN, remove the header there too if
+the CDN adds its own copy or passes it on (Cloudflare: a managed transform
+in Rules, "Remove X-Powered-By headers").
 
 ## Development
 

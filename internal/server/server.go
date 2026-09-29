@@ -51,6 +51,15 @@ const (
 // frameAncestors is the CSP that only lets vitrine frame itself.
 const frameAncestors = "frame-ancestors 'self'"
 
+// poweredBy is the value of the X-Powered-By header, which follows the
+// version of the program.
+func poweredBy(version string) string {
+	if version == "" {
+		return "vitrine"
+	}
+	return "vitrine/" + version
+}
+
 // Options configure a Server.
 type Options struct {
 	Tree           *tree.Tree
@@ -72,9 +81,11 @@ type Server struct {
 	extDir   string
 	cacheDir string
 	version  string
-	trusted  []netip.Prefix
-	log      *slog.Logger
-	commands atomic.Pointer[map[string]bool]
+	// poweredBy is the value of the X-Powered-By header: "vitrine/<version>"
+	poweredBy string
+	trusted   []netip.Prefix
+	log       *slog.Logger
+	commands  atomic.Pointer[map[string]bool]
 	// rootCheck tests that the shared folder is accessible; readyBusy is
 	// set while a check runs, readyState remembers the last answer
 	rootCheck  func() error
@@ -97,6 +108,7 @@ func New(o Options) *Server {
 		public:     o.Public,
 		cacheDir:   o.CacheDir,
 		version:    o.Version,
+		poweredBy:  poweredBy(o.Version),
 		trusted:    o.TrustedProxies,
 		log:        o.Logger,
 		sessions:   auth.NewSessions(),
@@ -126,6 +138,7 @@ func New(o Options) *Server {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("X-Powered-By", s.poweredBy)
 	// no framing by other sites (clickjacking); the frontend itself frames
 	// same-origin previews
 	h.Set("X-Frame-Options", "SAMEORIGIN")

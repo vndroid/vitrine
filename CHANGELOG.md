@@ -4,6 +4,12 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.4 - 2026-09-29
+
+- every response carries `X-Powered-By: vitrine/<version>`, following the
+  version of the program; the README shows how to hide it in nginx
+  (`proxy_hide_header`) and Caddy (`header_down -X-Powered-By`)
+
 ## 0.4.3 - 2026-09-29
 
 - health endpoints like the ones of Prometheus: `/-/healthy` answers 200
