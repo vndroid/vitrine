@@ -1,6 +1,4 @@
 const storekey = '_vitrine';
-// preferences stored by h5fs on the same origin are taken over once
-const legacyStorekey = '_h5fs';
 
 // localStorage can be missing or throw (private windows, blocked storage),
 // preferences are then only kept in memory
@@ -37,19 +35,7 @@ const load = () => {
     if (!storage) {
         return memory;
     }
-    const obj = read(storekey);
-    if (obj) {
-        return obj;
-    }
-    const legacy = read(legacyStorekey);
-    if (legacy) {
-        save(legacy);
-        try {
-            storage.removeItem(legacyStorekey);
-        } catch {/* skip */}
-        return legacy;
-    }
-    return {};
+    return read(storekey) || {};
 };
 
 const put = (key, value) => {

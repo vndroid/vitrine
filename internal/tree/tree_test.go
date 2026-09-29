@@ -17,7 +17,7 @@ import (
 //	outside/secret.txt, outside/dir/x.txt
 //	root/a.txt, root/.secret, root/my file#1.txt
 //	root/_vitrine.headers.md
-//	root/sub/b.jpg, root/sub/_h5fs.footer.html, root/sub/.hidden/c.txt
+//	root/sub/b.jpg, root/sub/_vitrine.footer.html, root/sub/.hidden/c.txt
 //	root/site/index.html
 //	root/cache/t.jpg                  (excluded)
 //	root/link-out -> ../outside/dir   (folder outside the root)
@@ -32,19 +32,19 @@ func fixture(t *testing.T) (*Tree, string) {
 	base, _ = filepath.EvalSymlinks(base)
 	root := filepath.Join(base, "root")
 	files := map[string]string{
-		"outside/secret.txt":         "secret",
-		"outside/dir/x.txt":          "x",
-		"outside/dir/.dot":           "d",
-		"outside/dir/sub2/y.txt":     "y",
-		"root/a.txt":                 "aaa",
-		"root/.secret":               "s",
-		"root/my file#1.txt":         "1",
-		"root/_vitrine.headers.md":   "# header",
-		"root/sub/b.jpg":             "b",
-		"root/sub/_h5fs.footer.html": "<p>footer</p>",
-		"root/sub/.hidden/c.txt":     "c",
-		"root/site/index.html":       "<html>",
-		"root/cache/t.jpg":           "t",
+		"outside/secret.txt":            "secret",
+		"outside/dir/x.txt":             "x",
+		"outside/dir/.dot":              "d",
+		"outside/dir/sub2/y.txt":        "y",
+		"root/a.txt":                    "aaa",
+		"root/.secret":                  "s",
+		"root/my file#1.txt":            "1",
+		"root/_vitrine.headers.md":      "# header",
+		"root/sub/b.jpg":                "b",
+		"root/sub/_vitrine.footer.html": "<p>footer</p>",
+		"root/sub/.hidden/c.txt":        "c",
+		"root/site/index.html":          "<html>",
+		"root/cache/t.jpg":              "t",
 	}
 	for name, content := range files {
 		p := filepath.Join(base, name)
@@ -276,7 +276,7 @@ func TestFolderSize(t *testing.T) {
 	tr, _ := fixture(t)
 	for _, it := range tr.Items("/", 1) {
 		if it.Href == "/sub/" {
-			// b.jpg (1) + _h5fs.footer.html (13) + .hidden/c.txt (1)
+			// b.jpg (1) + _vitrine.footer.html (13) + .hidden/c.txt (1)
 			if it.Size == nil || *it.Size != 15 {
 				t.Errorf("sub size = %v", it.Size)
 			}

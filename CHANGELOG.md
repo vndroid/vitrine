@@ -4,6 +4,20 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.3.0 - 2026-09-29
+
+Removes the compatibility with h5fs and other deprecated code:
+
+- `_h5fs.` custom header/footer files and the `^_h5fs` hidden pattern
+- `download.type` is `tar` or `zip` only (no `php-tar`, `shell-tar`,
+  `shell-zip`)
+- thumbnails only use `ffmpeg` and ImageMagick 7 (`magick`); `avconv`,
+  `convert` and GraphicsMagick (`gm`) are no longer detected or used
+- the API error code is spelled `ERR_ILLEGAL_PARAM`
+- the frontend no longer takes over preferences stored by h5fs
+- thumbnail cache names use SHA-224 instead of SHA-1; files of older
+  versions are cleaned up by the cache limit
+
 ## 0.2.3 - 2026-09-29
 
 - shared files and folder index files are opened once, after the access

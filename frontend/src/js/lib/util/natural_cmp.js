@@ -1,7 +1,7 @@
 // Natural Sort algorithm for Javascript - Version 0.7 - Released under MIT license
 // Author: Jim Palmer (based on chunking idea from Dave Koelle)
 
-// Modified to make it work with h5ai/vitrine
+// Modified to make it work with vitrine
 
 const RE_TOKEN = /(^([+\-]?(?:0|[1-9]\d*)(?:\.\d*)?(?:[eE][+\-]?\d+)?)?$|^0x[0-9a-f]+$|\d+)/gi;
 const RE_DATE = /(^([\w ]+,?[\w ]+)?[\w ]+,?[\w ]+\d+:\d+(:\d+)?[\w ]?|^\d{1,4}[\/\-]\d{1,4}[\/\-]\d{1,4}|^\w+, \w+ \d+, \d{4})/;

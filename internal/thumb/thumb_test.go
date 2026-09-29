@@ -329,7 +329,7 @@ func TestVideoCapture(t *testing.T) {
 
 func TestDocCapture(t *testing.T) {
 	tool := ""
-	for _, c := range []string{"magick", "convert"} {
+	for _, c := range []string{"magick"} {
 		if _, err := exec.LookPath(c); err == nil {
 			tool = c
 			break
@@ -473,7 +473,7 @@ func TestMagickImagesNeedImageMagick(t *testing.T) {
 
 func TestAVIFCapture(t *testing.T) {
 	tool := ""
-	for _, c := range []string{"magick", "convert"} {
+	for _, c := range []string{"magick"} {
 		if _, err := exec.LookPath(c); err == nil {
 			tool = c
 			break

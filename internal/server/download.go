@@ -54,9 +54,9 @@ func (s *Server) onDownload(w http.ResponseWriter, r *http.Request, p params) {
 
 	var ext string
 	switch typ {
-	case "tar", "php-tar", "shell-tar": // h5fs names still accepted
+	case "tar":
 		ext = ".tar"
-	case "zip", "shell-zip":
+	case "zip":
 		ext = ".zip"
 	default:
 		s.apiFail(w, fail(errFailed, "packaging failed"))

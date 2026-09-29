@@ -10,7 +10,7 @@ func TestCompile(t *testing.T) {
 		noMatch    []string
 	}{
 		{`^\.`, false, []string{".git", ".env"}, []string{"a.txt"}},
-		{`^_h5fs`, false, []string{"_h5fs", "_h5fs.header.md"}, []string{"x_h5fs"}},
+		{`^_vitrine`, false, []string{"_vitrine", "_vitrine.header.md"}, []string{"x_vitrine"}},
 		// the h5fs client escapes spaces and "#" (esc_pattern)
 		{`my\ file\#1`, false, []string{"my file#1.txt"}, []string{"myfile#1"}},
 		// advanced search: characters joined with ".*?"

@@ -106,7 +106,7 @@ stays active.
 
 - Only entries of "managed" folders below the root are listed and
   served. Entries matching `view.hidden` (by default dotfiles and
-  `_vitrine*`/`_h5fs*` files) are neither listed nor served.
+  `_vitrine*` files) are neither listed nor served.
 - Symbolic links are followed only if their target is inside the root,
   unless `-follow-symlinks` is set. The hidden rules always apply to the
   path below the root and, for targets inside the root, to the target;
@@ -186,29 +186,6 @@ example.com {
 
 If Caddy itself is behind another proxy or a CDN, list those in Caddy's
 `trusted_proxies` server option, so `{client_ip}` is the visitor.
-
-## Migrating from h5fs
-
-- Copy your `_h5fs/private/conf/options.json` into the config folder. Your
-  `passhash` keeps working (PHP bcrypt/argon2 and SHA512 hashes).
-- Custom header/footer files may keep the `_h5fs.` prefix; `_vitrine.` is
-  the new one.
-- vitrine serves the files itself: no PHP, no `.htaccess`, no web server
-  rules. Point your proxy at vitrine instead of the h5fs `index.php`.
-- Changes in behavior:
-  - hidden entries are no longer downloadable by direct URL;
-  - symbolic links leaving the root are neither listed nor served, unless
-    `-follow-symlinks` is set;
-  - packages are built by vitrine, no `tar`/`zip` commands are needed;
-    `download.type` is now `tar` or `zip`, the h5fs values `php-tar`,
-    `shell-tar` and `shell-zip` still work (as does `foldersize.type`
-    `php`, now called `sum`);
-  - view preferences stored by h5fs in the browser are taken over when
-    vitrine runs on the same origin;
-  - thumbnails respect the EXIF orientation of photos;
-  - `thumbnails.exif` only uses embedded EXIF thumbnails that are large
-    enough and have the photo's aspect ratio (no blurry or letterboxed
-    thumbnails).
 
 ## Development
 

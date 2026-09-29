@@ -10,7 +10,7 @@ import (
 type rule func(v *validator, n *node, path string)
 
 var rules = map[string]rule{
-	"download.type":                   oneOf("tar", "zip", "php-tar", "shell-tar", "shell-zip"),
+	"download.type":                   oneOf("tar", "zip"),
 	"download.maxConcurrent":          intRange(1, 64),
 	"download.maxConcurrentPerClient": intRange(1, 64),
 	"download.maxDuration":            intRange(1, -1),

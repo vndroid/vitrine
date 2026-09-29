@@ -9,7 +9,7 @@
     Recommended: a bcrypt hash, e.g. generated with
         vitrine passwd
     Hashes created by PHP's password_hash() (bcrypt or argon2) and plain
-    SHA512 hex digests are still accepted for compatibility with h5fs.
+    SHA512 hex digests are still accepted for compatibility with PHP.
 
     After 5 failed logins within 15 minutes a client is locked out for 15 minutes.
     */
@@ -75,7 +75,7 @@
         "fastBrowsing": true,
         "fonts": ["Ubuntu", "Roboto", "Helvetica", "Arial", "sans-serif"],
         "fontsMono": ["Ubuntu Mono", "Monaco", "Lucida Sans Typewriter", "monospace"],
-        "hidden": ["^\\.", "^_vitrine", "^_h5fs"],
+        "hidden": ["^\\.", "^_vitrine"],
         "hideFolders": false,
         "hideIf403": true,
         "hideParentFolder": false,
@@ -115,7 +115,6 @@
     First checks for files "_vitrine.header.html" and "_vitrine.footer.html" in the current directory.
     If not successful it checks all parent directories (starting in the current directory) for
     files "_vitrine.headers.html" and "_vitrine.footers.html".
-    The former "_h5fs." file name prefix is still accepted.
     Note the different filenames: "header" (only current) - "headers" (current and sub directories)!
     The file's content will be placed inside a <div/> tag above/below the main content.
     If a file's extension is ".md" instead of ".html" its content will be interpreted as markdown.
@@ -133,8 +132,7 @@
     Enable packaged download of selected entries.
     To select files the "select"-extension needs to be enabled.
 
-    - type: string, "tar" or "zip" (the h5fs names "php-tar", "shell-tar"
-        and "shell-zip" are still accepted)
+    - type: string, "tar" or "zip"
     - packageName: string, basename of the download package, null for current filename or foldername
     - alwaysVisible: boolean, always show download button (defaults to download the current folder)
     - maxConcurrent: number, max number of downloads running at the same time
@@ -379,9 +377,9 @@
     - img: array of strings, file types (see "types.json") rendered by vitrine,
         supported: img-bmp, img-gif, img-jpg, img-png, img-webp; img-avif and
         img-heic are converted with ImageMagick (needs its HEIF support)
-    - mov: array of strings, file types captured with ffmpeg/avconv, supported:
+    - mov: array of strings, file types captured with ffmpeg, supported:
         vid-avi, vid-flv, vid-mkv, vid-mov, vid-mp4, vid-mpg, vid-ts, vid-vob, vid-webm, vid-wmv
-    - doc: array of strings, file types captured with ImageMagick/GraphicsMagick, supported:
+    - doc: array of strings, file types captured with ImageMagick, supported:
         x-pdf, x-ps, x-eps
       The thumbnail type is always derived on the server from the file name,
       files are only passed to these tools with an explicit input format.

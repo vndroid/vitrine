@@ -1,10 +1,10 @@
-// Package thumb renders and caches thumbnails of images, videos (ffmpeg,
-// avconv) and documents (ImageMagick, GraphicsMagick) like h5fs.
+// Package thumb renders and caches thumbnails of images, videos (ffmpeg)
+// and documents (ImageMagick).
 package thumb
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"hash/fnv"
@@ -39,8 +39,8 @@ const (
 )
 
 var (
-	fileRe = regexp.MustCompile(`^(thumb|capture)-[0-9a-f]{40}(-\d+x\d+)?\.jpg$`)
-	nameRe = regexp.MustCompile(`^thumb-[0-9a-f]{40}-\d+x\d+\.jpg$`)
+	fileRe = regexp.MustCompile(`^(thumb|capture)-[0-9a-f]{40,56}(-\d+x\d+)?\.jpg$`)
+	nameRe = regexp.MustCompile(`^thumb-[0-9a-f]{56}-\d+x\d+\.jpg$`)
 )
 
 var defaultCategoryTypes = map[string][]string{
@@ -173,7 +173,7 @@ func (s *Service) category(fileType string) string {
 }
 
 func sourceID(path string) string {
-	sum := sha1.Sum([]byte(path))
+	sum := sha256.Sum224([]byte(path))
 	return hex.EncodeToString(sum[:])
 }
 
@@ -248,10 +248,6 @@ func (s *Service) captureMov(fileType, src string) (string, bool) {
 				"-protocol_whitelist", "file", "-format_whitelist", format, "-f", format,
 				"-ss", at, "-i", src, "-an", "-frames:v", "1", "-f", "image2", "-update", "1", dest}
 		}
-	case s.hasCmd("avconv"):
-		cmd = func(at, dest string) []string {
-			return []string{"avconv", "-nostdin", "-y", "-f", format, "-ss", at, "-i", src, "-an", "-vframes", "1", dest}
-		}
 	default:
 		return "", false
 	}
@@ -269,11 +265,8 @@ func (s *Service) captureImage(fileType, src string) (string, bool) {
 	in := format + ":" + src + "[0]"
 	resize := fmt.Sprintf("%dx%d>", maxThumbDimension, maxThumbDimension)
 	args := []string{in, "-auto-orient", "-resize", resize, "-quality", "90", "-strip", "jpg:"}
-	switch {
-	case s.hasCmd("magick"):
+	if s.hasCmd("magick") {
 		return s.capture(src, append([]string{"magick"}, args...))
-	case s.hasCmd("convert"):
-		return s.capture(src, append([]string{"convert"}, args...))
 	}
 	return "", false
 }
@@ -285,14 +278,9 @@ func (s *Service) captureDoc(fileType, src string) (string, bool) {
 	}
 	// an explicit coder: the input is never auto-detected from its content
 	in := format + ":" + src + "[0]"
-	switch {
-	case s.hasCmd("magick"): // ImageMagick 7, where "convert" is deprecated
+	if s.hasCmd("magick") {
 		// operators like -strip have to follow the input in ImageMagick 7
 		return s.capture(src, []string{"magick", "-density", "200", in, "-quality", "100", "-strip", "jpg:"})
-	case s.hasCmd("convert"):
-		return s.capture(src, []string{"convert", "-density", "200", "-quality", "100", "-strip", in, "jpg:"})
-	case s.hasCmd("gm"):
-		return s.capture(src, []string{"gm", "convert", "-density", "200", "-quality", "100", in, "jpg:"})
 	}
 	return "", false
 }

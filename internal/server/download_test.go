@@ -19,7 +19,7 @@ func formDownload(s http.Handler, form string) *httptest.ResponseRecorder {
 func TestDownloadTar(t *testing.T) {
 	s, _ := newTestServer(t, fixtureOpts{})
 	// the form the h5fs client posts
-	rec := formDownload(s, "action=download&as=my%20files&type=php-tar&baseHref=%2F&hrefs=&hrefs%5B0%5D=%2Fa.txt&hrefs%5B1%5D=%2Fsub%2F")
+	rec := formDownload(s, "action=download&as=my%20files&type=tar&baseHref=%2F&hrefs=&hrefs%5B0%5D=%2Fa.txt&hrefs%5B1%5D=%2Fsub%2F")
 	if rec.Code != 200 {
 		t.Fatalf("download = %d %s", rec.Code, rec.Body.String())
 	}
@@ -46,7 +46,7 @@ func TestDownloadTar(t *testing.T) {
 
 func TestDownloadZip(t *testing.T) {
 	s, _ := newTestServer(t, fixtureOpts{})
-	rec := formDownload(s, "action=download&as=pkg.ZIP&type=shell-zip&baseHref=%2Fsub%2F&hrefs=")
+	rec := formDownload(s, "action=download&as=pkg.ZIP&type=zip&baseHref=%2Fsub%2F&hrefs=")
 	zr, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(rec.Body.Len()))
 	if err != nil {
 		t.Fatalf("zip: %v", err)
@@ -66,17 +66,17 @@ func TestDownloadZip(t *testing.T) {
 func TestDownloadFailures(t *testing.T) {
 	s, _ := newTestServer(t, fixtureOpts{})
 	for form, want := range map[string]string{
-		"action=download&as=x&type=evil&baseHref=%2F":                     errFailed,
-		"action=download&as=x&type=php-tar&baseHref=%2F..%2F":             errFailed,
-		"action=download&as=x&type=php-tar&baseHref=%2F&hrefs=%2F.secret": errFailed,
-		"action=download&type=php-tar&baseHref=%2F":                       errMissingParam,
+		"action=download&as=x&type=evil&baseHref=%2F":                 errFailed,
+		"action=download&as=x&type=tar&baseHref=%2F..%2F":             errFailed,
+		"action=download&as=x&type=tar&baseHref=%2F&hrefs=%2F.secret": errFailed,
+		"action=download&type=tar&baseHref=%2F":                       errMissingParam,
 	} {
 		if body := formDownload(s, form).Body.String(); !strings.Contains(body, want) {
 			t.Errorf("%s => %s, want %s", form, body, want)
 		}
 	}
 	off, _ := newTestServer(t, fixtureOpts{options: `{"download": {"enabled": false}}`})
-	if body := formDownload(off, "action=download&as=x&type=php-tar&baseHref=%2F").Body.String(); !strings.Contains(body, errDisabled) {
+	if body := formDownload(off, "action=download&as=x&type=tar&baseHref=%2F").Body.String(); !strings.Contains(body, errDisabled) {
 		t.Errorf("disabled download = %s", body)
 	}
 }
@@ -103,7 +103,7 @@ func TestPackageName(t *testing.T) {
 
 func TestDownloadTypeNames(t *testing.T) {
 	s, _ := newTestServer(t, fixtureOpts{})
-	for typ, ext := range map[string]string{"tar": ".tar", "php-tar": ".tar", "shell-tar": ".tar", "zip": ".zip", "shell-zip": ".zip"} {
+	for typ, ext := range map[string]string{"tar": ".tar", "zip": ".zip"} {
 		rec := formDownload(s, "action=download&as=p&type="+typ+"&baseHref=%2Fsub%2F&hrefs=")
 		if !strings.Contains(rec.Header().Get("Content-Disposition"), `filename="p`+ext+`"`) {
 			t.Errorf("type %s: %s %s", typ, rec.Header().Get("Content-Disposition"), rec.Body.String())

@@ -16,10 +16,10 @@ import (
 
 const maxAPIBody = 1 << 20
 
-// Error codes of the h5fs API (the misspelling is part of the protocol).
+// Error codes of the API.
 const (
 	errMissingParam = "ERR_MISSING_PARAM"
-	errIllegalParam = "ERR_ILLIGAL_PARAM"
+	errIllegalParam = "ERR_ILLEGAL_PARAM"
 	errFailed       = "ERR_FAILED"
 	errDisabled     = "ERR_DISABLED"
 	errUnsupported  = "ERR_UNSUPPORTED"

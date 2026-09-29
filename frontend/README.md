@@ -1,6 +1,6 @@
 # vitrine frontend
 
-The browser frontend of vitrine, continued from the h5fs/h5ai frontend:
+The browser frontend of vitrine:
 plain ES modules bundled with esbuild (target ES2020) and LESS styles.
 
 ```sh

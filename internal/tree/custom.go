@@ -5,9 +5,8 @@ import (
 	"path/filepath"
 )
 
-// FilePrefixes are the prefixes of custom header and footer files, the
-// former h5fs prefix is still accepted.
-var FilePrefixes = []string{"_vitrine", "_h5fs"}
+// FilePrefixes are the prefixes of custom header and footer files.
+var FilePrefixes = []string{"_vitrine"}
 
 var customExtensions = []string{"html", "md"}
 

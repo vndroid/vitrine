@@ -58,7 +58,7 @@ func TestLoadEmbeddedDefaults(t *testing.T) {
 
 func TestHidden(t *testing.T) {
 	c := loadDefaults(t)
-	for _, name := range []string{".", "..", ".git", "_vitrine.header.md", "_h5fs"} {
+	for _, name := range []string{".", "..", ".git", "_vitrine.header.md"} {
 		if !c.IsHidden(name) {
 			t.Errorf("%q should be hidden", name)
 		}

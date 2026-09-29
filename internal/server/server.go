@@ -247,7 +247,7 @@ func unescape(p string) (string, error) {
 	return b.String(), nil
 }
 
-var checkedCommands = []string{"avconv", "convert", "du", "ffmpeg", "gm", "magick"}
+var checkedCommands = []string{"du", "ffmpeg", "magick"}
 
 func (s *Server) detectCommands() {
 	cmds := map[string]bool{}

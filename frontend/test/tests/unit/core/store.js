@@ -3,14 +3,12 @@ import store from '../../../../src/js/lib/core/store.js';
 
 const {test, assert} = scar;
 
-test('core.store takes over h5fs preferences', () => {
+test('core.store persists preferences', () => {
     const ls = global.window.localStorage;
     ls.clear();
-    ls.setItem('_h5fs', JSON.stringify({view: {mode: 'grid', size: 40}}));
+    ls.setItem('_vitrine', JSON.stringify({view: {mode: 'grid', size: 40}}));
 
     assert.deep_equal(store.get('view'), {mode: 'grid', size: 40});
-    assert.equal(ls.getItem('_h5fs'), null, 'legacy key removed');
-    assert.deep_equal(JSON.parse(ls.getItem('_vitrine')), {view: {mode: 'grid', size: 40}});
 
     store.put('sort', {column: 1});
     assert.deep_equal(JSON.parse(ls.getItem('_vitrine')).sort, {column: 1});

@@ -75,13 +75,13 @@ const addTests = () => {
     );
 
     addTest(
-        'Movie thumbs', 'Command line program <code>ffmpeg</code> or <code>avconv</code> available',
-        setup.HAS_CMD_FFMPEG || setup.HAS_CMD_AVCONV
+        'Movie thumbs', 'Command line program <code>ffmpeg</code> available',
+        setup.HAS_CMD_FFMPEG
     );
 
     addTest(
-        'PDF thumbs', 'ImageMagick (<code>magick</code>, <code>convert</code>) or GraphicsMagick (<code>gm</code>) available',
-        setup.HAS_CMD_MAGICK || setup.HAS_CMD_CONVERT || setup.HAS_CMD_GM
+        'PDF thumbs', 'ImageMagick (<code>magick</code>) available',
+        setup.HAS_CMD_MAGICK
     );
 
     addTest(
