@@ -114,6 +114,31 @@ jobs:
           outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ env.IMAGE_NAME }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ env.IMAGE_NAME }}-${{ matrix.arch }}
+      # Runs the pushed image, so a wrong version, commit or architecture
+      # stops the release before the manifest gets its tags.
+      - name: Check the image version (${{ matrix.arch }})
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          PLATFORM: ${{ matrix.arch }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          REVISION: ${{ github.sha }}
+        run: |
+          OUT=$(docker run --rm --platform "$PLATFORM" "$IMAGE" --version)
+          echo "$OUT"
+          HEAD=$(echo "$OUT" | head -n 1)
+          case "$HEAD" in
+            "vitrine, version ${VERSION} ("*) ;;
+            *) echo "Error: expected version ${VERSION}"; exit 1 ;;
+          esac
+          case "$HEAD" in
+            *"revision: ${REVISION})") ;;
+            *) echo "Error: expected revision ${REVISION}"; exit 1 ;;
+          esac
+          if ! echo "$OUT" | grep -Eq "^[[:space:]]*Platform:[[:space:]]+${PLATFORM}$"; then
+            echo "Error: expected platform ${PLATFORM}"
+            exit 1
+          fi
+          echo "OK: ${VERSION} ${REVISION:0:7} ${PLATFORM}"
       - name: Export digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
