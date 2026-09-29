@@ -105,4 +105,31 @@
             margin: 4px 0 0 0;
         }
     }
+
+    // the label and the result are 250px each: on narrow screens the label
+    // takes the free width, the result stays right of it and the info
+    // gets a line of its own
+    @media only screen and (max-width: 700px) {
+        #tests {
+            display: block;
+            margin: 24px 0;
+
+            .test {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: baseline;
+            }
+            .label {
+                flex: 1 1 0;
+                width: auto;
+            }
+            .result {
+                flex: 0 0 auto;
+                width: auto;
+            }
+            .info {
+                flex: 1 0 100%;
+            }
+        }
+    }
 }
