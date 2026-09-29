@@ -164,14 +164,31 @@ func TestRangeAndConditional(t *testing.T) {
 
 func TestActiveContentIsSandboxed(t *testing.T) {
 	s, _ := newTestServer(t, fixtureOpts{})
-	if csp := do(s, "GET", "/page.html", "", nil).Header().Get("Content-Security-Policy"); csp != "sandbox" {
+	if csp := do(s, "GET", "/page.html", "", nil).Header().Get("Content-Security-Policy"); csp != "sandbox; frame-ancestors 'self'" {
 		t.Errorf("html CSP = %q", csp)
 	}
-	if csp := do(s, "GET", "/a.txt", "", nil).Header().Get("Content-Security-Policy"); csp != "" {
+	if csp := do(s, "GET", "/a.txt", "", nil).Header().Get("Content-Security-Policy"); csp != "frame-ancestors 'self'" {
 		t.Errorf("txt CSP = %q", csp)
 	}
 	if ct := do(s, "GET", "/code.php", "", nil).Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/plain") {
 		t.Errorf("php Content-Type = %q", ct)
+	}
+}
+
+func TestFramingHeaders(t *testing.T) {
+	s, _ := newTestServer(t, fixtureOpts{})
+	for _, target := range []string{"/", "/a.txt", "/nope", "/_vitrine/public/"} {
+		h := do(s, "GET", target, "", nil).Header()
+		if h.Get("X-Frame-Options") != "SAMEORIGIN" {
+			t.Errorf("%s: X-Frame-Options = %q", target, h.Get("X-Frame-Options"))
+		}
+		if !strings.Contains(h.Get("Content-Security-Policy"), "frame-ancestors 'self'") {
+			t.Errorf("%s: CSP = %q", target, h.Get("Content-Security-Policy"))
+		}
+	}
+	h := do(s, "POST", "/", `{"action":"get"}`, map[string]string{"Content-Type": "application/json"}).Header()
+	if h.Get("X-Frame-Options") != "SAMEORIGIN" {
+		t.Errorf("API: X-Frame-Options = %q", h.Get("X-Frame-Options"))
 	}
 }
 

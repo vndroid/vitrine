@@ -116,7 +116,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, realPath stri
 	case plainTypes[ext]:
 		h.Set("Content-Type", "text/plain; charset=utf-8")
 	case activeTypes[ext]:
-		h.Set("Content-Security-Policy", "sandbox")
+		h.Set("Content-Security-Policy", "sandbox; "+frameAncestors)
 	}
 	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 }

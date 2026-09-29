@@ -4,6 +4,13 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.2.2 - 2026-09-29
+
+- every response carries `X-Frame-Options: SAMEORIGIN` and
+  `Content-Security-Policy: frame-ancestors 'self'`, so other sites can't
+  frame vitrine (clickjacking); previews framed by vitrine itself keep
+  working
+
 ## 0.2.1 - 2026-09-29
 
 - `vitrine -v` / `--version` prints the version with branch, revision,

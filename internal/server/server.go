@@ -31,6 +31,9 @@ const (
 	ThumbsHref     = "/_vitrine/thumbs/"
 )
 
+// frameAncestors is the CSP that only lets vitrine frame itself.
+const frameAncestors = "frame-ancestors 'self'"
+
 // Options configure a Server.
 type Options struct {
 	Tree           *tree.Tree
@@ -99,7 +102,12 @@ func New(o Options) *Server {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("X-Content-Type-Options", "nosniff")
+	h := w.Header()
+	h.Set("X-Content-Type-Options", "nosniff")
+	// no framing by other sites (clickjacking); the frontend itself frames
+	// same-origin previews
+	h.Set("X-Frame-Options", "SAMEORIGIN")
+	h.Set("Content-Security-Policy", frameAncestors)
 
 	if r.Method == http.MethodPost {
 		if _, ok := s.relToBase(r.URL.EscapedPath()); !ok {
