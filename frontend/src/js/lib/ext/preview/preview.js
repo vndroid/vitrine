@@ -3,6 +3,11 @@ import event from '../../core/event.js';
 import resource from '../../core/resource.js';
 import allsettings from '../../core/settings.js';
 import store from '../../core/store.js';
+const unsupportedTpl =
+        `<div id="pv-content-unsupported">
+            <p class="l10n-previewUnsupported">This file can't be played in the browser.</p>
+            <a class="l10n-download">download</a>
+        </div>`;
 const {each, isFn, dom, includes, compact} = util;
 
 
@@ -286,9 +291,19 @@ const init = () => {
         .on('load', updateGui);
 };
 
+// Content shown instead of a player the browser can't use: a message and
+// a download link.
+const unsupported = item => {
+    const $el = dom(unsupportedTpl);
+    $el.find('a').attr('href', item.absHref).attr('download', item.label);
+    global.window.setTimeout(() => event.pub('l10n.refresh'), 0);
+    return $el;
+};
+
 export default {
     setLabels,
     register,
+    unsupported,
     get item() {
         return session && session.item;
     }

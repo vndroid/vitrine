@@ -34,8 +34,17 @@ const addUnloadFn = el => {
 
 const load = item => {
     return new Promise(resolve => {
+        let failed = false;
         const $el = dom(tpl)
             .on('loadedmetadata', () => resolve($el))
+            // unsupported format or broken file: offer the download instead
+            // of a spinner that never ends
+            .on('error', () => {
+                if (!failed) {
+                    failed = true;
+                    resolve(preview.unsupported(item));
+                }
+            })
             .attr('controls', 'controls');
         if (settings.autoplay) {
             $el.attr('autoplay', 'autoplay');

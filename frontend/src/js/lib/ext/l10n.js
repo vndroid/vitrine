@@ -21,6 +21,7 @@ const defaultTranslations = {
     dateFormat: 'YYYY-MM-DD HH:mm',
     details: 'details',
     download: 'download',
+    previewUnsupported: 'This file can\'t be played in the browser.',
     empty: 'empty',
     files: 'files',
     filter: 'filter',
@@ -138,6 +139,8 @@ const init = () => {
     event.sub('view.changed', () => {
         localize(langs, settings.lang, settings.useBrowserLang);
     });
+    // content added later (e.g. previews) asks to be translated
+    event.sub('l10n.refresh', () => update());
 };
 
 

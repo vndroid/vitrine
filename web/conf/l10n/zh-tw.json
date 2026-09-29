@@ -4,6 +4,7 @@
     "dateFormat": "YYYY-MM-DD HH:mm",
     "details": "詳細資料",
     "download": "下載",
+    "previewUnsupported": "瀏覽器無法播放此檔案。",
     "empty": "空資料夾",
     "files": "檔案",
     "filter": "過濾",
