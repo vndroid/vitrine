@@ -111,7 +111,7 @@ func TestRenderSizes(t *testing.T) {
 		{small, 100, 0, 50, 20},
 	}
 	for _, tt := range tests {
-		img, err := render(tt.path, tt.w, tt.h)
+		img, err := render(tt.path, tt.w, tt.h, false)
 		if err != nil {
 			t.Fatalf("render %s: %v", tt.path, err)
 		}
@@ -122,12 +122,12 @@ func TestRenderSizes(t *testing.T) {
 
 	// square crop of a landscape image: centered, so the middle shows the
 	// red/green border at the top
-	img, _ := render(land, 100, 100)
+	img, _ := render(land, 100, 100, false)
 	if !near(img.At(10, 10), 255, 0, 0) || !near(img.At(90, 10), 0, 255, 0) {
 		t.Error("landscape crop not centered")
 	}
 	// portrait to landscape: top aligned like h5fs
-	img, _ = render(port, 100, 50)
+	img, _ = render(port, 100, 50, false)
 	if !near(img.At(10, 10), 255, 0, 0) || !near(img.At(10, 45), 255, 0, 0) {
 		t.Error("portrait crop not top aligned")
 	}
@@ -141,7 +141,7 @@ func TestRenderRejectsBadSources(t *testing.T) {
 	} {
 		p := filepath.Join(dir, name)
 		writeFile(t, p, data)
-		if _, err := render(p, 100, 100); err == nil {
+		if _, err := render(p, 100, 100, false); err == nil {
 			t.Errorf("render(%s) should fail", name)
 		}
 	}
@@ -150,7 +150,7 @@ func TestRenderRejectsBadSources(t *testing.T) {
 	var buf bytes.Buffer
 	png.Encode(&buf, image.NewGray(image.Rect(0, 0, 6000, 5000)))
 	writeFile(t, huge, buf.Bytes())
-	if _, err := render(huge, 100, 100); err == nil {
+	if _, err := render(huge, 100, 100, false); err == nil {
 		t.Error("30 MP image should be rejected")
 	}
 }
@@ -162,12 +162,12 @@ func TestEXIFOrientation(t *testing.T) {
 		// stored landscape, displayed portrait (rotate 90 degrees clockwise)
 		writeFile(t, p, jpegWithOrientation(t, quadrants(200, 100), 6, bo))
 		f, _ := os.Open(p)
-		if o := jpegOrientation(f); o != 6 {
+		if o := jpegExif(f).orientation; o != 6 {
 			t.Fatalf("orientation = %d", o)
 		}
 		f.Close()
 
-		img, err := render(p, 100, 0)
+		img, err := render(p, 100, 0, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -183,7 +183,7 @@ func TestEXIFOrientation(t *testing.T) {
 	for o := uint16(1); o <= 8; o++ {
 		p := filepath.Join(dir, "o.jpg")
 		writeFile(t, p, jpegWithOrientation(t, quadrants(200, 100), o, binary.BigEndian))
-		img, err := render(p, 240, 240)
+		img, err := render(p, 240, 240, false)
 		if err != nil || img.Bounds().Dx() != 240 || img.Bounds().Dy() != 240 {
 			t.Errorf("orientation %d: %v %v", o, img.Bounds(), err)
 		}
@@ -348,5 +348,103 @@ func TestDocCapture(t *testing.T) {
 	s, _ := New(tr, cfg, filepath.Join(base, "cache"), func(c string) bool { _, err := exec.LookPath(c); return err == nil }, nil)
 	if _, ok := s.Thumb("doc", "/d.pdf", 240, 240); !ok {
 		t.Error("pdf thumbnail failed")
+	}
+}
+
+func solid(w, h int, c color.Color) image.Image {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.Set(x, y, c)
+		}
+	}
+	return img
+}
+
+// jpegWithThumb encodes photo as JPEG with an EXIF orientation (IFD0) and
+// an embedded thumbnail (IFD1).
+func jpegWithThumb(t *testing.T, photo, thumb image.Image, o uint16) []byte {
+	t.Helper()
+	var main, small bytes.Buffer
+	jpeg.Encode(&main, photo, &jpeg.Options{Quality: 90})
+	jpeg.Encode(&small, thumb, &jpeg.Options{Quality: 60})
+	bo := binary.BigEndian
+	var tiff bytes.Buffer
+	tiff.WriteString("MM")
+	binary.Write(&tiff, bo, uint16(42))
+	binary.Write(&tiff, bo, uint32(8))
+	// IFD0 at 8: 1 entry, next IFD at 8+2+12+4 = 26
+	binary.Write(&tiff, bo, uint16(1))
+	binary.Write(&tiff, bo, []uint16{0x0112, 3})
+	binary.Write(&tiff, bo, uint32(1))
+	binary.Write(&tiff, bo, []uint16{o, 0})
+	binary.Write(&tiff, bo, uint32(26))
+	// IFD1 at 26: 2 entries, thumbnail data at 26+2+24+4 = 56
+	binary.Write(&tiff, bo, uint16(2))
+	binary.Write(&tiff, bo, []uint16{0x0201, 4})
+	binary.Write(&tiff, bo, []uint32{1, 56})
+	binary.Write(&tiff, bo, []uint16{0x0202, 4})
+	binary.Write(&tiff, bo, []uint32{1, uint32(small.Len())})
+	binary.Write(&tiff, bo, uint32(0))
+	tiff.Write(small.Bytes())
+	app1 := append([]byte("Exif\x00\x00"), tiff.Bytes()...)
+	seg := []byte{0xFF, 0xE1, 0, 0}
+	binary.BigEndian.PutUint16(seg[2:], uint16(len(app1)+2))
+	out := append([]byte{0xFF, 0xD8}, seg...)
+	out = append(out, app1...)
+	return append(out, main.Bytes()[2:]...)
+}
+
+func TestEmbeddedEXIFThumb(t *testing.T) {
+	dir := t.TempDir()
+	blue, red := color.RGBA{0, 0, 255, 255}, color.RGBA{255, 0, 0, 255}
+	tests := []struct {
+		name         string
+		photo, thumb image.Image
+		o            uint16
+		useExif      bool
+		w, h         int
+		wantRed      bool
+	}{
+		{"used", solid(640, 480, blue), solid(320, 240, red), 1, true, 240, 240, true},
+		{"option off", solid(640, 480, blue), solid(320, 240, red), 1, false, 240, 240, false},
+		{"too small", solid(640, 480, blue), solid(160, 120, red), 1, true, 240, 240, false},
+		{"black bars (other ratio)", solid(640, 360, blue), solid(320, 240, red), 1, true, 240, 240, false},
+		{"samples decode the photo", solid(640, 480, blue), solid(320, 240, red), 1, true, 240, 0, false},
+		{"rotated", solid(640, 480, blue), solid(320, 240, red), 6, true, 240, 240, true},
+	}
+	for _, tt := range tests {
+		p := filepath.Join(dir, "p.jpg")
+		writeFile(t, p, jpegWithThumb(t, tt.photo, tt.thumb, tt.o))
+		img, err := render(p, tt.w, tt.h, tt.useExif)
+		if err != nil {
+			t.Fatalf("%s: %v", tt.name, err)
+		}
+		if got := near(img.At(5, 5), 255, 0, 0); got != tt.wantRed {
+			t.Errorf("%s: embedded thumb used = %v, want %v", tt.name, got, tt.wantRed)
+		}
+	}
+	// the rotated embedded thumbnail is turned like the photo
+	p := filepath.Join(dir, "r.jpg")
+	writeFile(t, p, jpegWithThumb(t, solid(640, 480, blue), solid(320, 240, red), 6))
+	img, _ := render(p, 180, 240, true)
+	if b := img.Bounds(); b.Dx() != 180 || b.Dy() != 240 || !near(img.At(5, 5), 255, 0, 0) {
+		t.Errorf("rotated embedded thumb: %v", b)
+	}
+}
+
+func TestServiceUsesEXIFOption(t *testing.T) {
+	s, root := service(t, `{"thumbnails": {"size": 240, "exif": true}}`)
+	writeFile(t, filepath.Join(root, "e.jpg"), jpegWithThumb(t, solid(640, 480, color.RGBA{0, 0, 255, 255}), solid(320, 240, color.RGBA{255, 0, 0, 255}), 1))
+	name, ok := s.Thumb("img", "/e.jpg", 240, 240)
+	if !ok {
+		t.Fatal("thumb failed")
+	}
+	p, _ := s.Path(name)
+	f, _ := os.Open(p)
+	defer f.Close()
+	img, _ := jpeg.Decode(f)
+	if !near(img.At(5, 5), 255, 0, 0) {
+		t.Error("thumbnails.exif must use the embedded thumbnail")
 	}
 }

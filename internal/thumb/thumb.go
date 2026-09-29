@@ -207,7 +207,9 @@ func (s *Service) thumb(src string, width, height int) (string, bool) {
 		return "", false
 	}
 	s.sem <- struct{}{}
-	img, err := render(src, width, height)
+	// like h5fs: embedded EXIF thumbnails only for thumbnails, not samples
+	useExif := s.cfg.IsTrue("thumbnails.exif") && height != 0
+	img, err := render(src, width, height, useExif)
 	<-s.sem
 	if err != nil {
 		return "", false

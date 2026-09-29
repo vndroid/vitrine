@@ -387,7 +387,9 @@
     - delay: number, delay in milliseconds after "dom-ready" before thumb-requesting starts
     - size: number, size in pixel of the generated thumbnails
         (only this size and "preview-img.size" are generated on request)
-    - exif: boolean, use included EXIF thumbs if possible
+    - exif: boolean, use the thumbnail embedded in JPEG photos (EXIF) instead of
+        decoding the whole photo, if it is at least as large as the thumbnail
+        and has the photo's aspect ratio (faster, a bit less sharp)
     - chunksize: int, number of thumbs per request
     - maxCacheSize: number, max disk usage of the thumbnail cache in MiB,
         least recently used thumbnails are removed when it is exceeded

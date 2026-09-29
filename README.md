@@ -154,8 +154,9 @@ location /files/ {
   - view preferences stored by h5fs in the browser are taken over when
     vitrine runs on the same origin;
   - thumbnails respect the EXIF orientation of photos;
-  - the thumbnail option `thumbnails.exif` (embedded EXIF thumbnails) is
-    ignored.
+  - `thumbnails.exif` only uses embedded EXIF thumbnails that are large
+    enough and have the photo's aspect ratio (no blurry or letterboxed
+    thumbnails).
 
 ## Development
 

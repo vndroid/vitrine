@@ -8,53 +8,61 @@ import (
 	"io"
 )
 
-// jpegOrientation reads the EXIF orientation (1-8) of a JPEG, 1 if absent.
-func jpegOrientation(r io.Reader) int {
+// exifInfo is what vitrine reads from the EXIF data of a JPEG.
+type exifInfo struct {
+	orientation int    // 1-8
+	thumb       []byte // embedded JPEG thumbnail, if any
+}
+
+// jpegExif reads the EXIF orientation and embedded thumbnail of a JPEG.
+func jpegExif(r io.Reader) exifInfo {
+	info := exifInfo{orientation: 1}
 	br := bufio.NewReader(io.LimitReader(r, 1<<20))
 	var soi [2]byte
 	if _, err := io.ReadFull(br, soi[:]); err != nil || soi != [2]byte{0xFF, 0xD8} {
-		return 1
+		return info
 	}
 	for {
 		var hdr [4]byte
 		if _, err := io.ReadFull(br, hdr[:2]); err != nil || hdr[0] != 0xFF {
-			return 1
+			return info
 		}
 		marker := hdr[1]
 		if marker == 0xD8 || marker >= 0xD0 && marker <= 0xD7 || marker == 0x01 {
 			continue // markers without length
 		}
 		if marker == 0xDA || marker == 0xD9 { // start of scan, end of image
-			return 1
+			return info
 		}
 		if _, err := io.ReadFull(br, hdr[2:]); err != nil {
-			return 1
+			return info
 		}
 		size := int(binary.BigEndian.Uint16(hdr[2:])) - 2
 		if size < 0 {
-			return 1
+			return info
 		}
 		if marker != 0xE1 {
 			if _, err := br.Discard(size); err != nil {
-				return 1
+				return info
 			}
 			continue
 		}
 		seg := make([]byte, size)
 		if _, err := io.ReadFull(br, seg); err != nil {
-			return 1
+			return info
 		}
-		if o := exifOrientation(seg); o != 0 {
-			return o
+		if parseExif(seg, &info) {
+			return info
 		}
 	}
 }
 
-// exifOrientation parses an APP1 segment ("Exif\0\0" + TIFF).
-func exifOrientation(seg []byte) int {
+// parseExif reads an APP1 segment ("Exif\0\0" + TIFF): the orientation of
+// IFD0 and the thumbnail of IFD1. It reports whether seg was EXIF.
+func parseExif(seg []byte, info *exifInfo) bool {
 	tiff, ok := bytes.CutPrefix(seg, []byte("Exif\x00\x00"))
 	if !ok || len(tiff) < 8 {
-		return 0
+		return false
 	}
 	var bo binary.ByteOrder
 	switch string(tiff[:2]) {
@@ -63,25 +71,45 @@ func exifOrientation(seg []byte) int {
 	case "MM":
 		bo = binary.BigEndian
 	default:
-		return 0
+		return false
 	}
-	ifd := int(bo.Uint32(tiff[4:8]))
-	if ifd < 8 || ifd+2 > len(tiff) {
-		return 0
-	}
-	n := int(bo.Uint16(tiff[ifd:]))
-	for i := 0; i < n; i++ {
-		e := ifd + 2 + i*12
-		if e+12 > len(tiff) {
+	// entries calls fn for the entries of the IFD at off and returns the
+	// offset of the next IFD (0 if none or invalid)
+	entries := func(off int, fn func(tag, typ uint16, value []byte)) int {
+		if off < 8 || off+2 > len(tiff) {
 			return 0
 		}
-		if bo.Uint16(tiff[e:]) == 0x0112 && bo.Uint16(tiff[e+2:]) == 3 {
-			if o := int(bo.Uint16(tiff[e+8:])); o >= 1 && o <= 8 {
-				return o
+		n := int(bo.Uint16(tiff[off:]))
+		end := off + 2 + n*12
+		if end+4 > len(tiff) {
+			return 0
+		}
+		for i := 0; i < n; i++ {
+			e := tiff[off+2+i*12:]
+			fn(bo.Uint16(e), bo.Uint16(e[2:]), e[8:12])
+		}
+		return int(bo.Uint32(tiff[end:]))
+	}
+	next := entries(int(bo.Uint32(tiff[4:8])), func(tag, typ uint16, v []byte) {
+		if tag == 0x0112 && typ == 3 { // Orientation, SHORT
+			if o := int(bo.Uint16(v)); o >= 1 && o <= 8 {
+				info.orientation = o
 			}
 		}
+	})
+	var thumbOff, thumbLen int
+	entries(next, func(tag, typ uint16, v []byte) {
+		switch tag {
+		case 0x0201: // JPEGInterchangeFormat
+			thumbOff = int(bo.Uint32(v))
+		case 0x0202: // JPEGInterchangeFormatLength
+			thumbLen = int(bo.Uint32(v))
+		}
+	})
+	if thumbOff > 8 && thumbLen > 0 && thumbOff+thumbLen <= len(tiff) {
+		info.thumb = tiff[thumbOff : thumbOff+thumbLen]
 	}
-	return 0
+	return true
 }
 
 // swapsAxes reports whether an orientation turns the image by 90 degrees.

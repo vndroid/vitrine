@@ -1,6 +1,7 @@
 package thumb
 
 import (
+	"bytes"
 	"errors"
 	"image"
 	"image/color"
@@ -9,6 +10,7 @@ import (
 	"image/jpeg"
 	_ "image/png" // register decoder
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -31,8 +33,10 @@ var errSource = errors.New("thumb: unsupported or too large image")
 // render decodes an image and returns a width x height thumbnail, cropped
 // like h5fs (horizontally centered, top aligned) on a white background.
 // A height of 0 returns a proportional sample of at most width pixels on
-// the longer side. EXIF orientation is applied.
-func render(path string, width, height int) (*image.RGBA, error) {
+// the longer side. EXIF orientation is applied. With useExif the JPEG's
+// embedded EXIF thumbnail is used instead of decoding the whole photo,
+// if it is large enough and has the photo's aspect ratio.
+func render(path string, width, height int, useExif bool) (*image.RGBA, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -49,18 +53,24 @@ func render(path string, width, height int) (*image.RGBA, error) {
 		return nil, errSource
 	}
 	o := 1
+	var src image.Image
 	if format == "jpeg" {
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
 			return nil, err
 		}
-		o = jpegOrientation(f)
+		info := jpegExif(f)
+		o = info.orientation
+		if useExif && height != 0 && info.thumb != nil {
+			src = embeddedThumb(info, cfg, width, height)
+		}
 	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return nil, err
-	}
-	src, _, err := image.Decode(f)
-	if err != nil {
-		return nil, errSource
+	if src == nil {
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+		if src, _, err = image.Decode(f); err != nil {
+			return nil, errSource
+		}
 	}
 
 	sw, sh := src.Bounds().Dx(), src.Bounds().Dy()
@@ -103,6 +113,31 @@ func render(path string, width, height int) (*image.RGBA, error) {
 	draw.Draw(dst, dst.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
 	xdraw.CatmullRom.Scale(dst, dst.Bounds(), src, crop, xdraw.Over, nil)
 	return orient(dst, o), nil
+}
+
+// embeddedThumb decodes the EXIF thumbnail if it covers width x height
+// (no upscaling) and has the aspect ratio of the photo (no black bars).
+func embeddedThumb(info exifInfo, photo image.Config, width, height int) image.Image {
+	img, err := jpeg.Decode(bytes.NewReader(info.thumb))
+	if err != nil {
+		return nil
+	}
+	tw, th := img.Bounds().Dx(), img.Bounds().Dy()
+	if tw <= 0 || th <= 0 {
+		return nil
+	}
+	dw, dh := tw, th // displayed size
+	if swapsAxes(info.orientation) {
+		dw, dh = th, tw
+	}
+	if dw < width || dh < height {
+		return nil
+	}
+	photoR := float64(photo.Width) / float64(photo.Height)
+	if math.Abs(float64(tw)/float64(th)-photoR)/photoR > 0.02 {
+		return nil
+	}
+	return img
 }
 
 func writeJPEG(path string, img image.Image) error {
