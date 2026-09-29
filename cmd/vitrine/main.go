@@ -212,13 +212,15 @@ func defaultCacheDir() string {
 	return filepath.Join(dir, "vitrine")
 }
 
+// buildVersion returns the version without the "v" of the git tag, e.g.
+// "0.1.0"; untagged builds report a pseudo version or commit.
 func buildVersion() string {
 	if version != "" {
-		return version
+		return strings.TrimPrefix(version, "v")
 	}
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if info.Main.Version != "" && info.Main.Version != "(devel)" {
-			return info.Main.Version
+			return strings.TrimPrefix(info.Main.Version, "v")
 		}
 		for _, s := range info.Settings {
 			if s.Key == "vcs.revision" && len(s.Value) >= 7 {

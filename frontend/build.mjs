@@ -16,7 +16,8 @@ const ROOT = import.meta.dirname;
 const SRC = path.join(ROOT, 'src');
 const OUT = path.resolve(ROOT, '..', 'web', 'public');
 const pkg = JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8'));
-const banner = `/* vitrine frontend v${pkg.version} - ${pkg.homepage} */\n`;
+// no version: the output must only change with the sources
+const banner = `/* vitrine frontend - ${pkg.homepage} */\n`;
 
 async function write(dest, content) {
     await fs.mkdir(path.dirname(dest), {recursive: true});

@@ -1,4 +1,4 @@
-/* vitrine frontend v0.1.0 - https://github.com/vndroid/vitrine */
+/* vitrine frontend - https://github.com/vndroid/vitrine */
 
 
 /* eslint-disable func-names,no-var */
