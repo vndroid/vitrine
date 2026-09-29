@@ -24,17 +24,20 @@ const (
 	errDisabled     = "ERR_DISABLED"
 	errUnsupported  = "ERR_UNSUPPORTED"
 	errLocked       = "ERR_LOCKED"
+	errBusy         = "ERR_BUSY"
 )
 
-// apiError is sent as {"err": ..., "msg": ...} with status 200, like h5fs.
+// apiError is sent as {"err": ..., "msg": ...} with status 200 like h5fs,
+// or with Status if set.
 type apiError struct {
-	Err string `json:"err"`
-	Msg string `json:"msg"`
+	Err    string `json:"err"`
+	Msg    string `json:"msg"`
+	Status int    `json:"-"`
 }
 
 func (e *apiError) Error() string { return e.Err + ": " + e.Msg }
 
-func fail(code, msg string) *apiError { return &apiError{code, msg} }
+func fail(code, msg string) *apiError { return &apiError{Err: code, Msg: msg} }
 
 // params are the request parameters: the JSON body if it is a JSON
 // object, otherwise the form (for downloads), like h5fs.
@@ -278,7 +281,11 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiFail(w http.ResponseWriter, err error) {
 	if ae, ok := err.(*apiError); ok {
-		writeJSON(w, http.StatusOK, ae)
+		status := http.StatusOK
+		if ae.Status != 0 {
+			status = ae.Status
+		}
+		writeJSON(w, status, ae)
 		return
 	}
 	s.log.Error("api", "err", err)
@@ -373,7 +380,11 @@ func (s *Server) onGet(r *http.Request, p params) (map[string]any, error) {
 		if err != nil {
 			return nil, err
 		}
-		res["thumbs"] = s.thumbs(reqs)
+		thumbs, err := s.thumbs(r, reqs)
+		if err != nil {
+			return nil, err
+		}
+		res["thumbs"] = thumbs
 	}
 	return res, nil
 }

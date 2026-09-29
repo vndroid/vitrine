@@ -492,3 +492,19 @@ func TestAVIFCapture(t *testing.T) {
 		t.Error("avif thumbnail failed")
 	}
 }
+
+func TestRenderQueueBound(t *testing.T) {
+	s, _ := service(t, "")
+	s.waiting.Store(maxWaiting)
+	if s.acquire() {
+		t.Fatal("a full queue must refuse")
+	}
+	s.waiting.Store(0)
+	if !s.acquire() {
+		t.Fatal("slot expected")
+	}
+	<-s.sem
+	if _, ok := s.Thumb("img", "/a.png", 240, 240); !ok {
+		t.Error("thumb after the queue drained")
+	}
+}

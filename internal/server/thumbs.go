@@ -5,22 +5,42 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 )
 
-// maxThumbRequests per API request, like h5fs.
-const maxThumbRequests = 40
+const (
+	// maxThumbRequests per API request, like h5fs.
+	maxThumbRequests = 40
+	// thumbnail requests in progress, globally and per client (the client
+	// sends them one after another)
+	maxThumbCalls          = 16
+	maxThumbCallsPerClient = 2
+)
+
+// thumbCallTimeout bounds one request: later thumbnails are answered with
+// null (a variable for tests).
+var thumbCallTimeout = 30 * time.Second
 
 // thumbs answers the "thumbs" request of the client: one thumbnail href
 // (or null) per request.
-func (s *Server) thumbs(reqs []any) []*string {
+func (s *Server) thumbs(r *http.Request, reqs []any) ([]*string, error) {
 	if len(reqs) > maxThumbRequests {
-		return []*string{}
+		return []*string{}, nil
 	}
 	out := make([]*string, len(reqs))
 	if s.thumb == nil {
-		return out
+		return out, nil
 	}
+	release, ok := s.thumbCalls.Acquire(ClientID(s.clientOf(r).addr), maxThumbCalls, maxThumbCallsPerClient)
+	if !ok {
+		return nil, &apiError{errBusy, "too many thumbnail requests", http.StatusTooManyRequests}
+	}
+	defer release()
+	deadline := time.Now().Add(thumbCallTimeout)
 	for i, raw := range reqs {
+		if time.Now().After(deadline) {
+			break
+		}
 		req, ok := raw.(map[string]any)
 		if !ok {
 			continue
@@ -37,7 +57,7 @@ func (s *Server) thumbs(reqs []any) []*string {
 			out[i] = &h
 		}
 	}
-	return out
+	return out, nil
 }
 
 func numeric(v any) (int, bool) {

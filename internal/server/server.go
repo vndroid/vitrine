@@ -58,23 +58,26 @@ type Server struct {
 	sessions *auth.Sessions
 	throttle *auth.Throttle
 	slots    *archive.Slots
-	thumb    *thumb.Service
+	// thumbCalls limits concurrent thumbnail requests
+	thumbCalls *archive.Slots
+	thumb      *thumb.Service
 }
 
 // New creates a server.
 func New(o Options) *Server {
 	s := &Server{
-		tree:     o.Tree,
-		cfg:      o.Config,
-		assets:   &assets{fsys: o.Public, cache: map[string]*asset{}},
-		public:   o.Public,
-		cacheDir: o.CacheDir,
-		version:  o.Version,
-		trusted:  o.TrustedProxies,
-		log:      o.Logger,
-		sessions: auth.NewSessions(),
-		throttle: auth.NewThrottle(),
-		slots:    archive.NewSlots(),
+		tree:       o.Tree,
+		cfg:        o.Config,
+		assets:     &assets{fsys: o.Public, cache: map[string]*asset{}},
+		public:     o.Public,
+		cacheDir:   o.CacheDir,
+		version:    o.Version,
+		trusted:    o.TrustedProxies,
+		log:        o.Logger,
+		sessions:   auth.NewSessions(),
+		throttle:   auth.NewThrottle(),
+		slots:      archive.NewSlots(),
+		thumbCalls: archive.NewSlots(),
 	}
 	if s.log == nil {
 		s.log = slog.Default()

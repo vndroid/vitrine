@@ -3,6 +3,12 @@
 Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version.
 
+## 0.1.9 - 2026-09-29
+
+- limit thumbnail requests: 2 in progress per client and 16 in total,
+  more are answered with 429 ERR_BUSY; at most 32 renders wait for a
+  slot; one request stops generating after 30 seconds
+
 ## 0.1.8 - 2026-09-29
 
 - `-access-log` logs every request with the real client address (after

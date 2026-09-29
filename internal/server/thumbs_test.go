@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestThumbsAPI(t *testing.T) {
@@ -49,5 +50,38 @@ func TestThumbsAPI(t *testing.T) {
 	}
 	if res := post(t, off, `{"action":"get","thumbs":[{"type":"img"}]}`); res["err"] != errDisabled {
 		t.Errorf("disabled thumbs = %v", res)
+	}
+}
+
+func TestThumbsLimits(t *testing.T) {
+	s, root := newTestServer(t, fixtureOpts{})
+	var buf bytes.Buffer
+	png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 32, 32)))
+	os.WriteFile(filepath.Join(root, "pic.png"), buf.Bytes(), 0o644)
+	body := `{"action":"get","thumbs":[{"type":"img","href":"/pic.png","width":240,"height":240}]}`
+
+	// httptest requests come from 192.0.2.1: occupy its two slots
+	var releases []func()
+	for i := 0; i < maxThumbCallsPerClient; i++ {
+		release, _ := s.thumbCalls.Acquire("192.0.2.1", maxThumbCalls, maxThumbCallsPerClient)
+		releases = append(releases, release)
+	}
+	rec := do(s, "POST", "/", body, map[string]string{"Content-Type": "application/json"})
+	if rec.Code != 429 || !strings.Contains(rec.Body.String(), errBusy) {
+		t.Errorf("busy client = %d %s", rec.Code, rec.Body.String())
+	}
+	for _, r := range releases {
+		r()
+	}
+	if res := post(t, s, body); res["thumbs"].([]any)[0] == nil {
+		t.Error("released slots must allow requests again")
+	}
+
+	// past the request deadline the remaining thumbnails are null
+	old := thumbCallTimeout
+	thumbCallTimeout = -time.Second
+	defer func() { thumbCallTimeout = old }()
+	if res := post(t, s, body); res["thumbs"].([]any)[0] != nil {
+		t.Error("thumbnails after the deadline must be null")
 	}
 }

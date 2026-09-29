@@ -18,6 +18,7 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/vndroid/vitrine/internal/config"
@@ -34,6 +35,7 @@ const (
 	defaultMaxCacheMB = 512
 	cleanupRatio      = 0.8
 	lockStripes       = 64
+	maxWaiting        = 32 // renders waiting for a free slot
 )
 
 var (
@@ -68,8 +70,9 @@ type Service struct {
 	hasCmd func(string) bool
 	log    *slog.Logger
 
-	sem   chan struct{}
-	locks [lockStripes]sync.Mutex
+	sem     chan struct{}
+	waiting atomic.Int64 // renders and captures waiting for sem
+	locks   [lockStripes]sync.Mutex
 
 	usageMu    sync.Mutex
 	usage      int64
@@ -211,7 +214,9 @@ func (s *Service) thumb(src string, width, height int) (string, bool) {
 	if !s.reserve() {
 		return "", false
 	}
-	s.sem <- struct{}{}
+	if !s.acquire() {
+		return "", false
+	}
 	// like h5fs: embedded EXIF thumbnails only for thumbnails, not samples
 	useExif := s.cfg.IsTrue("thumbnails.exif") && height != 0
 	img, err := render(src, width, height, useExif)
@@ -316,7 +321,9 @@ func (s *Service) capture(src string, cmdlines ...[]string) (string, bool) {
 	for _, args := range cmdlines {
 		args = slices.Clone(args)
 		args[len(args)-1] += dest
-		s.sem <- struct{}{}
+		if !s.acquire() {
+			break
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), captureTimeout)
 		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 		cmd.WaitDelay = 5 * time.Second
@@ -333,6 +340,18 @@ func (s *Service) capture(src string, cmdlines ...[]string) (string, bool) {
 		return "", false
 	}
 	return dest, true
+}
+
+// acquire takes a render slot. It refuses instead of queueing without
+// bound: at most maxWaiting renders wait for a slot.
+func (s *Service) acquire() bool {
+	if s.waiting.Add(1) > maxWaiting {
+		s.waiting.Add(-1)
+		return false
+	}
+	s.sem <- struct{}{}
+	s.waiting.Add(-1)
+	return true
 }
 
 func fileSize(path string) int64 {
