@@ -139,10 +139,21 @@ func within(path, base string) bool {
 // IsHidden applies the "view.hidden" patterns to a single name.
 func (t *Tree) IsHidden(name string) bool { return t.cfg.IsHidden(name) }
 
+// ReservedName is the name of an entry of the root that is always hidden:
+// the URL "/-/" belongs to vitrine (the admin page), whatever the
+// "view.hidden" patterns say.
+const ReservedName = "-"
+
+// isReserved reports whether name in the folder parent is the reserved
+// entry of the root.
+func (t *Tree) isReserved(parent, name string) bool {
+	return name == ReservedName && parent == t.root
+}
+
 // isHiddenEntry applies the hidden rules to an entry of a resolved folder:
 // the plain name and the href of the entry are both matched.
 func (t *Tree) isHiddenEntry(resolvedParent, name string) bool {
-	if t.cfg.IsHidden(name) {
+	if t.isReserved(resolvedParent, name) || t.cfg.IsHidden(name) {
 		return true
 	}
 	if href, ok := t.ToHref(resolvedParent, true); ok {
@@ -162,7 +173,7 @@ func (t *Tree) ReadDir(path string) []string {
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
 		name := e.Name()
-		if t.cfg.IsHidden(name) || hrefOK && t.cfg.IsHidden(href+RawURLEncode(name)) {
+		if t.isReserved(path, name) || t.cfg.IsHidden(name) || hrefOK && t.cfg.IsHidden(href+RawURLEncode(name)) {
 			continue
 		}
 		if hideIf403 && !readable(filepath.Join(path, name)) {

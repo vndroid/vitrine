@@ -20,11 +20,13 @@ func TestBasePath(t *testing.T) {
 		base + "/":                              200,
 		base + "/a.txt":                         200,
 		base + "/_vitrine/public/js/scripts.js": 200,
-		base + "/_vitrine/public/":              200,
+		base + "/-/admin":                       200,
+		base + "/_vitrine/public/":              404,
 		base + "/.secret":                       404,
 		"/":                                     404,
 		"/a.txt":                                404,
 		"/_vitrine/public/js/scripts.js":        404,
+		"/-/admin":                              404,
 		"/my%20filesX/a.txt":                    404,
 	} {
 		if rec := do(s, "GET", target, "", nil); rec.Code != code {

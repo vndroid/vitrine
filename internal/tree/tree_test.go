@@ -430,3 +430,55 @@ func TestLinkedFolderSize(t *testing.T) {
 		}
 	}
 }
+
+// An entry named "-" in the root is reserved for the URL "/-/": it is
+// hidden and can't be served, whatever the hidden patterns say.
+func TestReservedName(t *testing.T) {
+	tr, root := fixture(t)
+	os.MkdirAll(filepath.Join(root, "-", "in"), 0o755)
+	os.WriteFile(filepath.Join(root, "-", "x.txt"), []byte("x"), 0o644)
+	os.WriteFile(filepath.Join(root, "sub", "-"), []byte("in a folder"), 0o644)
+	os.Symlink("-", filepath.Join(root, "alias"))
+
+	for _, name := range tr.ReadDir(root) {
+		if name == "-" {
+			t.Error("- is listed in the root")
+		}
+	}
+	found := false
+	for _, name := range tr.ReadDir(filepath.Join(root, "sub")) {
+		found = found || name == "-"
+	}
+	if !found {
+		t.Error("- in a subfolder should be listed")
+	}
+	if _, ok := tr.ResolveManagedPath(filepath.Join(root, "-")); ok {
+		t.Error("folder - resolves")
+	}
+	if _, ok := tr.ResolveManagedPath(filepath.Join(root, "-", "in")); ok {
+		t.Error("folder -/in resolves")
+	}
+	if _, ok := tr.ResolveManagedFile(filepath.Join(root, "-", "x.txt")); ok {
+		t.Error("file -/x.txt resolves")
+	}
+	if _, ok := tr.ResolveManagedPath(filepath.Join(root, "alias")); ok {
+		t.Error("a link to - resolves")
+	}
+	if f, ok := tr.OpenManagedFile(filepath.Join(root, "-", "x.txt")); ok {
+		f.Close()
+		t.Error("file -/x.txt opens")
+	}
+	if _, ok := tr.ResolveManagedFile(filepath.Join(root, "sub", "-")); !ok {
+		t.Error("file sub/- should be served")
+	}
+	for _, it := range tr.Search("/", "^-$", false) {
+		if it.Href == "/-/" || it.Href == "/-" {
+			t.Errorf("search found %s", it.Href)
+		}
+	}
+	for _, it := range tr.Items("/", 1) {
+		if it.Href == "/-/" {
+			t.Error("items lists /-/")
+		}
+	}
+}

@@ -18,7 +18,7 @@ with a self-contained server that serves the files itself.
   (ImageMagick), cached with a size limit
 - packaged downloads as tar or zip, streamed with limits
 - custom header and footer per folder, 35 languages, QR codes
-- admin info page with login (bcrypt, rate limited)
+- admin page at `/-/admin` with login (bcrypt, rate limited)
 
 ## Run
 
@@ -109,8 +109,8 @@ stays active.
 
 ### Admin password
 
-The admin login of the info page is off until `passhash` is set in
-`options.json`. Use a bcrypt hash; `vitrine passwd` asks for the password
+The admin login of the admin page (`/-/admin`) is off until `passhash` is
+set in `options.json`. Use a bcrypt hash; `vitrine passwd` asks for the password
 twice (without echo) and prints the hash:
 
 ```sh
@@ -138,6 +138,11 @@ Then run `vitrine validate -config <dir>` to check it. Notes:
 
 ## Security
 
+- The URL prefix `/-/` belongs to vitrine (the admin page at `/-/admin`,
+  below the `-base-path` if set). `-` is a reserved name: an entry called
+  `-` in the root of the shared folder is always hidden, is not served
+  and can't be downloaded, whatever `view.hidden` says. A `-` in a
+  subfolder is a normal entry.
 - Only entries of "managed" folders below the root are listed and
   served. Entries matching `view.hidden` (by default dotfiles and
   `_vitrine*` files) are neither listed nor served.

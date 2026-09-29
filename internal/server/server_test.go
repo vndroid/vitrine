@@ -177,7 +177,7 @@ func TestActiveContentIsSandboxed(t *testing.T) {
 
 func TestFramingHeaders(t *testing.T) {
 	s, _ := newTestServer(t, fixtureOpts{})
-	for _, target := range []string{"/", "/a.txt", "/nope", "/_vitrine/public/"} {
+	for _, target := range []string{"/", "/a.txt", "/nope", "/-/admin"} {
 		h := do(s, "GET", target, "", nil).Header()
 		if h.Get("X-Frame-Options") != "SAMEORIGIN" {
 			t.Errorf("%s: X-Frame-Options = %q", target, h.Get("X-Frame-Options"))
@@ -195,9 +195,8 @@ func TestFramingHeaders(t *testing.T) {
 func TestRedirects(t *testing.T) {
 	s, _ := newTestServer(t, fixtureOpts{})
 	for target, want := range map[string]string{
-		"/sub":             "/sub/",
-		"/sub?x=1":         "/sub/?x=1",
-		"/_vitrine/public": "/_vitrine/public/",
+		"/sub":     "/sub/",
+		"/sub?x=1": "/sub/?x=1",
 	} {
 		rec := do(s, "GET", target, "", nil)
 		if rec.Code != 301 || rec.Header().Get("Location") != want {
@@ -216,10 +215,16 @@ func TestReservedPaths(t *testing.T) {
 	if rec := do(s, "GET", "/_vitrine/public/js/scripts.js", "", map[string]string{"If-None-Match": etag}); rec.Code != 304 {
 		t.Errorf("If-None-Match = %d", rec.Code)
 	}
-	if body := do(s, "GET", "/_vitrine/public/", "", nil).Body.String(); !strings.Contains(body, `data-module="info"`) {
-		t.Error("info page expected")
+	for _, target := range []string{"/-/admin", "/-/admin/", "/%2D/admin"} {
+		if body := do(s, "GET", target, "", nil).Body.String(); !strings.Contains(body, `data-module="info"`) {
+			t.Errorf("GET %s: info page expected", target)
+		}
+	}
+	if rec := post(t, s, `{"action":"get","setup":true}`); rec["setup"] == nil {
+		t.Error("API not answered")
 	}
 	for _, target := range []string{
+		"/_vitrine/public/", "/_vitrine/public", "/_vitrine/", "/-", "/-/", "/-/x", "/-/admin/x", "/-/public/js/scripts.js",
 		"/_vitrine/public/../../etc/passwd", "/_vitrine/public/%2e%2e/x", "/_vitrine/nope",
 		"/_vitrine/public/ext/x.css", "/_vitrine/public/missing.js",
 	} {
@@ -229,6 +234,26 @@ func TestReservedPaths(t *testing.T) {
 	}
 	if rec := do(s, "PUT", "/a.txt", "", nil); rec.Code != 405 {
 		t.Errorf("PUT = %d", rec.Code)
+	}
+}
+
+func TestReservedNameIsNotShared(t *testing.T) {
+	s, root := newTestServer(t, fixtureOpts{})
+	os.MkdirAll(filepath.Join(root, "-"), 0o755)
+	os.WriteFile(filepath.Join(root, "-", "x.txt"), []byte("x"), 0o644)
+	for _, target := range []string{"/-/x.txt", "/%2D/x.txt", "/-/", "/-"} {
+		if rec := do(s, "GET", target, "", nil); rec.Code != 404 {
+			t.Errorf("GET %s = %d, want 404", target, rec.Code)
+		}
+	}
+	list := post(t, s, `{"action":"get","items":{"href":"/","what":1}}`)
+	if b, _ := json.Marshal(list); strings.Contains(string(b), `"/-/"`) {
+		t.Errorf("the root lists -: %s", b)
+	}
+	// the API answers on the admin page URL, where the page posts to
+	rec := do(s, "POST", "/-/admin", `{"action":"get","setup":true}`, map[string]string{"Content-Type": "application/json"})
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "PUBLIC_HREF") {
+		t.Errorf("POST /-/admin = %d %s", rec.Code, rec.Body.String())
 	}
 }
 

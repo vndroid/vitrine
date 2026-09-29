@@ -4,6 +4,16 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.0 - 2026-09-29
+
+- the admin page moved from `/_vitrine/public/` to `/-/admin`; the old
+  address is gone (not found). Below `/-/` only the admin page exists.
+  The frontend files (`/_vitrine/public/...`) and the thumbnails
+  (`/_vitrine/thumbs/...`) keep their addresses
+- `-` is a reserved name: an entry called `-` in the root of the shared
+  folder is always hidden and not served (a `-` in a subfolder is not
+  affected)
+
 ## 0.3.1 - 2026-09-29
 
 - frontend build: the unmaintained `cssmin` is replaced by esbuild's CSS

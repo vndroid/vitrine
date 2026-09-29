@@ -2,7 +2,7 @@
     /*
     Password hash.
 
-    Hash of the info page password. The admin login is disabled as long as
+    Hash of the admin password (the admin page is /-/admin). The admin login is disabled as long as
     no password is set (empty string, or the former preset: the SHA512 hash
     of the empty string).
 

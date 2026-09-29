@@ -23,7 +23,15 @@ import (
 	"github.com/vndroid/vitrine/internal/tree"
 )
 
-// URL prefixes reserved by vitrine, below the base path (--base-path); the
+// The first path segment below the base path (--base-path) that belongs to
+// vitrine is tree.ReservedName: "/-/admin" is the admin page, everything
+// else below "/-/" is not found. The tree hides a shared entry of this
+// name, so it can't be listed or served.
+
+// AdminPath is the admin page, below the base path.
+const AdminPath = "/-/admin"
+
+// URL prefixes of the frontend and thumbnails, below the base path; the
 // frontend reads the public href from the setup.
 const (
 	ReservedPrefix = "/_vitrine/"
@@ -133,6 +141,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if isReservedName(rel) {
+		s.serveBuiltin(w, r, rel)
+		return
+	}
 	if rest, ok := strings.CutPrefix(rel, ReservedPrefix); ok {
 		s.serveReserved(w, r, rest)
 		return
@@ -157,7 +169,25 @@ func (s *Server) publicHref() string { return s.tree.Base() + PublicHref }
 
 func (s *Server) thumbsHref() string { return s.tree.Base() + ThumbsHref }
 
-// serveReserved serves the frontend, the info page and thumbnails.
+// isReservedName reports whether the path (below the base) starts with the
+// reserved segment, however it is escaped.
+func isReservedName(rel string) bool {
+	seg, _, _ := strings.Cut(strings.TrimPrefix(rel, "/"), "/")
+	name, err := url.PathUnescape(seg)
+	return err == nil && name == tree.ReservedName
+}
+
+// serveBuiltin serves the pages below the reserved name: the admin page.
+func (s *Server) serveBuiltin(w http.ResponseWriter, r *http.Request, rel string) {
+	name, err := unescape(rel)
+	if err != nil || name != AdminPath && name != AdminPath+"/" {
+		s.notFound(w)
+		return
+	}
+	s.renderPage(w, r, "info", "")
+}
+
+// serveReserved serves the frontend and thumbnails.
 func (s *Server) serveReserved(w http.ResponseWriter, r *http.Request, rest string) {
 	name, err := unescape(rest)
 	if err != nil {
@@ -165,12 +195,6 @@ func (s *Server) serveReserved(w http.ResponseWriter, r *http.Request, rest stri
 		return
 	}
 	switch {
-	case name == "public/" || name == "public" || name == "":
-		if !strings.HasSuffix(r.URL.Path, "/") {
-			redirectSlash(w, r)
-			return
-		}
-		s.renderPage(w, r, "info", "")
 	case strings.HasPrefix(name, "public/ext/"):
 		s.serveExt(w, r, strings.TrimPrefix(name, "public/ext/"))
 	case strings.HasPrefix(name, "public/"):
