@@ -25,6 +25,5 @@ coverage.*
 # frontend dependencies
 /frontend/node_modules/
 
-# local assistant memory and notes
-/.memory/
-/CLAUDE.local.md
+# local assistant instructions, memory and settings (private: server address, rules)
+/.claude/
