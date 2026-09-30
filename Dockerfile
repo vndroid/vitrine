@@ -32,7 +32,7 @@ RUN apk add --no-cache ffmpeg imagemagick imagemagick-heic imagemagick-jpeg ghos
  && mkdir -p /share /cache /config \
  && chown vitrine:www-data /cache && chmod 2775 /cache
 COPY --from=build /out/vitrine /usr/local/bin/vitrine
-COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
+COPY --chmod=755 docker-entrypoint.sh docker-healthcheck.sh /usr/local/bin/
 USER vitrine
 ENV VITRINE_ROOT=/share \
     VITRINE_CACHE=/cache \
@@ -42,10 +42,10 @@ EXPOSE 8080
 VOLUME ["/cache"]
 WORKDIR /share
 
-# "docker ps" shows the state; the address follows VITRINE_LISTEN and
-# VITRINE_BASE_PATH (wget of busybox, no other tool needed)
+# "docker ps" shows the state; the script requests /-/healthy on the address
+# of VITRINE_LISTEN and VITRINE_BASE_PATH (wget of busybox, no other tool)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -q --spider "http://127.0.0.1:${VITRINE_LISTEN##*:}${VITRINE_BASE_PATH%/}/-/healthy" || exit 1
+  CMD ["docker-healthcheck.sh"]
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["vitrine"]
