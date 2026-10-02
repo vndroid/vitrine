@@ -194,6 +194,16 @@ func (s *Server) relToBase(href string) (string, bool) {
 
 func (s *Server) publicHref() string { return s.tree.Base() + PublicHref }
 
+// assetVersion is the "v" parameter of the addresses of the frontend files:
+// the version of the program, so a CDN or a browser that caches them by
+// address fetches them again after an upgrade.
+func (s *Server) assetVersion() string {
+	if s.version == "" {
+		return "dev"
+	}
+	return s.version
+}
+
 func (s *Server) thumbsHref() string { return s.tree.Base() + ThumbsHref }
 
 // isReservedName reports whether the path (below the base) starts with the
@@ -331,9 +341,10 @@ func (s *Server) hasCommand(name string) bool {
 // checks of the info page.
 func (s *Server) setupInfo(admin bool) map[string]any {
 	setup := map[string]any{
-		"AS_ADMIN":    admin,
-		"PUBLIC_HREF": s.publicHref(),
-		"ROOT_HREF":   s.tree.Base() + "/",
+		"AS_ADMIN":      admin,
+		"PUBLIC_HREF":   s.publicHref(),
+		"ASSET_VERSION": s.assetVersion(),
+		"ROOT_HREF":     s.tree.Base() + "/",
 	}
 	if !admin {
 		return setup

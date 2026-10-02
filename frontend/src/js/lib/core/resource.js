@@ -1,7 +1,7 @@
 import util from '../util/index.js';
 import config from '../config.js';
 import settings from './settings.js';
-const {includes} = util;
+const {includes, withVersion} = util;
 
 
 const imagesHref = settings.publicHref + 'images/';
@@ -11,9 +11,12 @@ const defaultThemeHref = themesHref + 'default/';
 const defaultIcons = ['file', 'folder', 'folder-page', 'folder-parent', 'ar', 'aud', 'bin', 'img', 'txt', 'vid', 'x'];
 
 
-const image = id => uiHref + id + '.svg';
+// the addresses carry the version of vitrine, see withVersion
+const versioned = href => withVersion(href, settings.assetVersion);
 
-const icon = id => {
+const image = id => versioned(uiHref + id + '.svg');
+
+const iconHref = id => {
     const baseId = (id || '').split('-')[0];
     const href = config.theme[id] || config.theme[baseId];
 
@@ -31,6 +34,8 @@ const icon = id => {
 
     return defaultThemeHref + 'file.svg';
 };
+
+const icon = id => versioned(iconHref(id));
 
 
 export default {

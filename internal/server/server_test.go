@@ -95,7 +95,7 @@ func TestIndexPage(t *testing.T) {
 		t.Fatalf("GET / = %d %s", rec.Code, rec.Header().Get("Content-Type"))
 	}
 	for _, want := range []string{
-		`<script src="/_vitrine/public/js/scripts.js" data-module="index">`,
+		`<script src="/_vitrine/public/js/scripts.js?v=test" data-module="index">`,
 		`<div id="fallback"><table>`,
 		`<a href="/a.txt">a.txt</a>`,
 		`<a href="/my%20file%231.txt">my file#1.txt</a>`,

@@ -28,7 +28,14 @@ const stop_event = (ev, keepDefault) => {
     }
 };
 
+// Adds the version to the address of a static file, so a CDN or a browser
+// that caches by address fetches the file again after an upgrade.
+const with_version = (href, version) => {
+    return version ? `${href}?v=${encodeURIComponent(version)}` : href;
+};
+
 export default {
     parsePattern: parse_pattern,
+    withVersion: with_version,
     stopEvent: stop_event
 };

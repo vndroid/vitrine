@@ -42,7 +42,7 @@ func TestBasePath(t *testing.T) {
 
 	page := do(s, "GET", base+"/", "", nil).Body.String()
 	for _, want := range []string{
-		`<script src="` + base + `/_vitrine/public/js/scripts.js"`,
+		`<script src="` + base + `/_vitrine/public/js/scripts.js?v=test"`,
 		`<a href="` + base + `/a.txt">a.txt</a>`,
 		`src="` + base + `/_vitrine/public/images/fallback/`,
 	} {

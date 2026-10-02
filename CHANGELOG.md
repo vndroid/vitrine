@@ -4,6 +4,15 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.7 - 2026-10-02
+
+- the addresses of the frontend files carry the version of vitrine as
+  `?v=<version>` (style sheet, script, favicons and all images, in the page,
+  in the plain listing and in the images the script loads), so a CDN that
+  caches by address fetches them again after an upgrade. The files are
+  served as before (`Cache-Control: no-cache`, `ETag`); the setup answers
+  `ASSET_VERSION`, which the script uses
+
 ## 0.4.6 - 2026-10-01
 
 - the text of a preview (markdown, text, source code) can be selected with

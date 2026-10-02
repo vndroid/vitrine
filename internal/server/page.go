@@ -14,7 +14,7 @@ const homepage = "https://github.com/vndroid/vitrine"
 // The markup matches the h5fs page template: the bundled frontend relies on
 // its ids and classes.
 var pageTmpl = template.Must(template.New("page").Parse(`<!DOCTYPE html>
-<html class="no-js" lang="en"><head><meta charset="utf-8"><meta http-equiv="x-ua-compatible" content="ie=edge"><title>{{.Title}}</title><meta name="description" content="{{.Title}}"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="shortcut icon" href="{{.PublicHref}}images/favicon/favicon-16-32.ico"><link rel="apple-touch-icon-precomposed" type="image/png" href="{{.PublicHref}}images/favicon/favicon-152.png"><link rel="stylesheet" href="{{.PublicHref}}css/styles.css">{{if not .Fallback}}<script src="{{.PublicHref}}js/scripts.js" data-module="{{.Module}}"></script>{{end}}
+<html class="no-js" lang="en"><head><meta charset="utf-8"><meta http-equiv="x-ua-compatible" content="ie=edge"><title>{{.Title}}</title><meta name="description" content="{{.Title}}"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="shortcut icon" href="{{.PublicHref}}images/favicon/favicon-16-32.ico?v={{.AssetVersion}}"><link rel="apple-touch-icon-precomposed" type="image/png" href="{{.PublicHref}}images/favicon/favicon-152.png?v={{.AssetVersion}}"><link rel="stylesheet" href="{{.PublicHref}}css/styles.css?v={{.AssetVersion}}">{{if not .Fallback}}<script src="{{.PublicHref}}js/scripts.js?v={{.AssetVersion}}" data-module="{{.Module}}"></script>{{end}}
 {{.HeadTags}}</head><body class="{{.Module}}" id="root"><div id="fallback-hints">{{if not .Fallback}}<span class="noJsMsg">Works best with JavaScript enabled!</span><span class="noBrowserMsg">Works best in <a href="http://browsehappy.com">modern browsers</a>!</span>{{end}}<span class="backlink"><a href="{{.Homepage}}" title="vitrine {{.Version}}">powered by vitrine</a></span></div>
 {{- if eq .Module "info"}}<div id="content"><h1 id="header"><a href="{{.Homepage}}">vitrine</a></h1></div>
 {{- else}}<div id="fallback">{{.FallbackHTML}}</div>{{end}}</body></html>
@@ -22,13 +22,14 @@ var pageTmpl = template.Must(template.New("page").Parse(`<!DOCTYPE html>
 
 var fallbackTmpl = template.Must(template.New("fallback").Parse(
 	`<table><tr><th class="fb-i"></th><th class="fb-n"><span>Name</span></th><th class="fb-d"><span>Last modified</span></th><th class="fb-s"><span>Size</span></th></tr>
-{{- if .HasParent}}<tr><td class="fb-i"><img src="{{.Images}}folder-parent.png" alt="folder-parent"/></td><td class="fb-n"><a href="..">Parent Directory</a></td><td class="fb-d"></td><td class="fb-s"></td></tr>{{end}}
-{{- range .Rows}}<tr><td class="fb-i"><img src="{{$.Images}}{{.Type}}.png" alt="{{.Type}}"/></td><td class="fb-n"><a href="{{.Href}}">{{.Name}}</a></td><td class="fb-d">{{.Date}}</td><td class="fb-s">{{.Size}}</td></tr>{{end}}</table>`))
+{{- if .HasParent}}<tr><td class="fb-i"><img src="{{.Images}}folder-parent.png?v={{.AssetVersion}}" alt="folder-parent"/></td><td class="fb-n"><a href="..">Parent Directory</a></td><td class="fb-d"></td><td class="fb-s"></td></tr>{{end}}
+{{- range .Rows}}<tr><td class="fb-i"><img src="{{$.Images}}{{.Type}}.png?v={{$.AssetVersion}}" alt="{{.Type}}"/></td><td class="fb-n"><a href="{{.Href}}">{{.Name}}</a></td><td class="fb-d">{{.Date}}</td><td class="fb-s">{{.Size}}</td></tr>{{end}}</table>`))
 
 type pageData struct {
 	Title        string
 	Module       string
 	PublicHref   string
+	AssetVersion string
 	Version      string
 	Homepage     string
 	Fallback     bool
@@ -48,11 +49,12 @@ func (s *Server) isFallbackMode(r *http.Request) bool {
 
 func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, module, dir string) {
 	data := pageData{
-		Module:     module,
-		PublicHref: s.publicHref(),
-		Version:    s.version,
-		Homepage:   homepage,
-		HeadTags:   s.headTags(),
+		Module:       module,
+		PublicHref:   s.publicHref(),
+		AssetVersion: s.assetVersion(),
+		Version:      s.version,
+		Homepage:     homepage,
+		HeadTags:     s.headTags(),
 	}
 	if module == "info" {
 		data.Title = "vitrine info page - " + s.version
@@ -91,10 +93,11 @@ func (s *Server) fallbackHTML(dir string) template.HTML {
 	}
 	var b strings.Builder
 	err := fallbackTmpl.Execute(&b, struct {
-		Images    string
-		HasParent bool
-		Rows      []fallbackRow
-	}{s.publicHref() + "images/fallback/", hasParent, rows})
+		Images       string
+		AssetVersion string
+		HasParent    bool
+		Rows         []fallbackRow
+	}{s.publicHref() + "images/fallback/", s.assetVersion(), hasParent, rows})
 	if err != nil {
 		s.log.Error("render fallback", "err", err)
 	}

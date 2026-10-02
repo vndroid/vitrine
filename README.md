@@ -292,6 +292,20 @@ which should print nothing. Behind a CDN, remove the header there too if
 the CDN adds its own copy or passes it on (Cloudflare: a managed transform
 in Rules, "Remove X-Powered-By headers").
 
+#### CDN and caching
+
+The addresses of the frontend files carry the version of vitrine as a
+parameter: `/_vitrine/public/js/scripts.js?v=0.4.7`, the same for the style
+sheet, the icons and every image. After an upgrade the URLs are new, so a CDN
+or browser that caches by address fetches the files again, without purging
+anything. The files are still sent with `Cache-Control: no-cache` and an
+`ETag`, so a cache that revalidates gets `304` as before.
+
+Keep the query string in the cache key of the CDN (Cloudflare does by
+default, "Cache Level: Standard"); with "Ignore query string" the version
+has no effect. Not versioned: the thumbnails (`/_vitrine/thumbs/`, cached for
+5 minutes), the files of the `ext` folder and the shared files themselves.
+
 ## Development
 
 ```sh
