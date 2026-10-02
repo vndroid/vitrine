@@ -15,6 +15,7 @@ const run = async () => {
     await import('./tests/unit/pre.js');
     await import('./tests/unit/util/naturalCmp.js');
     await import('./tests/unit/util/parsePatten.js');
+    await import('./tests/unit/util/stopEvent.js');
     await import('./tests/unit/util/sanitizeHtml.js');
     await import('./tests/unit/util/customHtml.js');
 

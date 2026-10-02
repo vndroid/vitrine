@@ -16,6 +16,19 @@ const parse_pattern = (sequence, advanced) => {
     }).join('|');
 };
 
+// Stops an event: it does not bubble and its default action is cancelled,
+// except for targets inside keepDefault (a selector), e.g. text that has to
+// stay selectable.
+const stop_event = (ev, keepDefault) => {
+    ev.stopPropagation();
+    const target = ev.target;
+    const keep = keepDefault && target && target.closest && target.closest(keepDefault);
+    if (!keep) {
+        ev.preventDefault();
+    }
+};
+
 export default {
-    parsePattern: parse_pattern
+    parsePattern: parse_pattern,
+    stopEvent: stop_event
 };

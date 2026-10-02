@@ -8,7 +8,7 @@ const unsupportedTpl =
             <p class="l10n-previewUnsupported">The browser can't open this file.</p>
             <a class="l10n-download">download</a>
         </div>`;
-const {each, isFn, dom, includes, compact} = util;
+const {each, isFn, dom, includes, compact, stopEvent} = util;
 
 
 const win = global.window;
@@ -137,6 +137,10 @@ const dropEvent = ev => {
     ev.stopPropagation();
     ev.preventDefault();
 };
+
+// Mouse events stay in the overlay, but the text of a preview keeps its
+// default action: it can be selected with the mouse and copied.
+const dropMouseEvent = ev => stopEvent(ev, '#pv-content-txt');
 
 const onKeydown = ev => {
     const key = ev.keyCode;
@@ -275,8 +279,8 @@ const init = () => {
                 exit();
             }
         })
-        .on('mousedown', dropEvent)
-        .on('mousemove', dropEvent)
+        .on('mousedown', dropMouseEvent)
+        .on('mousemove', dropMouseEvent)
         .on('keydown', dropEvent)
         .on('keypress', dropEvent);
 

@@ -4,6 +4,14 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.6 - 2026-10-01
+
+- the text of a preview (markdown, text, source code) can be selected with
+  the mouse and copied again: the preview overlay cancelled the default
+  action of every mouse press, which also kept the browser from starting a
+  selection. Mouse events still stay in the overlay, and everything else
+  in it (image and video previews, buttons, background) behaves as before
+
 ## 0.4.5 - 2026-09-29
 
 - `thumbnails.maxCacheTime`: days after which a thumbnail that was not used
