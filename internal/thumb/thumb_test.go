@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -623,5 +624,110 @@ func TestRunExpiry(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Error("RunExpiry did not stop with the context")
+	}
+}
+
+// Types without a Go decoder have to go through ImageMagick: a type that is
+// in the default list but in neither place never gets a thumbnail (ICO was
+// once like that).
+func TestDefaultImageTypesAreDecodable(t *testing.T) {
+	goDecoded := map[string]bool{"img-bmp": true, "img-gif": true, "img-jpg": true, "img-png": true, "img-webp": true}
+	for _, typ := range defaultCategoryTypes["img"] {
+		_, magick := magickImages[typ]
+		if !goDecoded[typ] && !magick {
+			t.Errorf("%s is a default image type, but neither Go nor ImageMagick converts it", typ)
+		}
+		if goDecoded[typ] && magick {
+			t.Errorf("%s is decoded by Go, it must not go through ImageMagick", typ)
+		}
+	}
+	for typ := range magickImages {
+		if !slices.Contains(defaultCategoryTypes["img"], typ) {
+			t.Errorf("%s is converted, but not in the default image types", typ)
+		}
+	}
+}
+
+// ImageMagick reads far more complex formats: a source above the limit is
+// refused without starting it.
+func TestMagickSourceLimit(t *testing.T) {
+	s, root := service(t, "")
+	started := false
+	s.hasCmd = func(string) bool { started = true; return true }
+	big := filepath.Join(root, "big.tiff")
+	f, err := os.Create(big)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Truncate(maxMagickSourceBytes + 1); err != nil {
+		t.Skipf("no sparse file here: %v", err)
+	}
+	f.Close()
+	if _, ok := s.Thumb("img", "/big.tiff", 240, 240); ok {
+		t.Error("a source above the limit got a thumbnail")
+	}
+	if started {
+		t.Error("ImageMagick was asked about a source above the limit")
+	}
+}
+
+func TestMagickFormats(t *testing.T) {
+	if _, err := exec.LookPath("magick"); err != nil {
+		t.Skip("ImageMagick not installed")
+	}
+	s, root := service(t, "")
+	s.hasCmd = func(c string) bool { _, err := exec.LookPath(c); return err == nil }
+	for _, name := range []string{"a.tiff", "b.tif", "c.ico", "d.psd", "e.tga", "f.jxl", "g.jp2"} {
+		p := filepath.Join(root, name)
+		if out, err := exec.Command("magick", "-size", "64x48", "gradient:red-blue", p).CombinedOutput(); err != nil {
+			t.Logf("ImageMagick can't write %s here: %s", name, out)
+			continue
+		}
+		thumb, ok := s.Thumb("img", "/"+name, 240, 240)
+		if !ok {
+			t.Errorf("%s: no thumbnail", name)
+			continue
+		}
+		file, _ := s.Path(thumb)
+		f, err := os.Open(file)
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+		cfg, err := jpeg.DecodeConfig(f)
+		f.Close()
+		if err != nil || cfg.Width != 240 || cfg.Height != 240 {
+			t.Errorf("%s: thumbnail %dx%d, %v", name, cfg.Width, cfg.Height, err)
+		}
+	}
+}
+
+// Transparent areas become white, like for the images Go decodes.
+func TestMagickTransparencyIsWhite(t *testing.T) {
+	if _, err := exec.LookPath("magick"); err != nil {
+		t.Skip("ImageMagick not installed")
+	}
+	s, root := service(t, "")
+	s.hasCmd = func(c string) bool { _, err := exec.LookPath(c); return err == nil }
+	p := filepath.Join(root, "clear.tiff")
+	if out, err := exec.Command("magick", "-size", "64x48", "xc:none", p).CombinedOutput(); err != nil {
+		t.Skipf("ImageMagick can't write TIFF here: %s", out)
+	}
+	capture, ok := s.captureImage("img-tiff", p)
+	if !ok {
+		t.Fatal("conversion failed")
+	}
+	f, err := os.Open(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	img, err := jpeg.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, g, b, _ := img.At(10, 10).RGBA()
+	if r>>8 < 240 || g>>8 < 240 || b>>8 < 240 {
+		t.Errorf("transparent pixel is (%d,%d,%d), want white", r>>8, g>>8, b>>8)
 	}
 }

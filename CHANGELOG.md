@@ -4,6 +4,19 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.8 - 2026-10-03
+
+- thumbnails (and the samples of `preview-img.size`) for TIFF, PSD, ICO,
+  JPEG 2000, JPEG XL and TGA images, converted with ImageMagick like AVIF and
+  HEIC; they are in the default `thumbnails.img`. ICO was in the list before
+  but never got a thumbnail, there was no decoder for it
+- ImageMagick conversions are limited: sources above 256 MiB are skipped,
+  memory, map, disk and time are capped, transparent areas become white and
+  CMYK is converted to sRGB
+- more file types: `.tif`, `.jfif`, `.jpe`, `.apng`, the RAW types `cr3`,
+  `arw`, `dng`, `raf`, `orf`, `rw2`, `pef` and `srw` (no preview, the browsers
+  can't show them), and the new types `img-jp2`, `img-jxl` and `img-tga`
+
 ## 0.4.7 - 2026-10-02
 
 - the addresses of the frontend files carry the version of vitrine as

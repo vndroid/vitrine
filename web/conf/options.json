@@ -257,7 +257,10 @@
     Show an image preview on click.
 
     - types: array of strings
-    - size: number, sample size, or false for original size
+    - size: number, sample size, or false for original size. With a size the
+        server sends a JPEG sample of the image, so types the browser can't
+        show can be previewed too: add img-heic, img-tiff, x-psd, ... to the
+        types (they have to be in "thumbnails.img" as well)
     */
     "preview-img": {
         "enabled": true,
@@ -375,8 +378,11 @@
     directory (--cache flag).
 
     - img: array of strings, file types (see "types.json") rendered by vitrine,
-        supported: img-bmp, img-gif, img-jpg, img-png, img-webp; img-avif and
-        img-heic are converted with ImageMagick (needs its HEIF support)
+        supported: img-bmp, img-gif, img-jpg, img-png, img-webp; img-avif,
+        img-heic, img-ico, img-jp2, img-jxl, img-tga, img-tiff and x-psd are
+        converted with ImageMagick (the Docker image has the coders; elsewhere
+        they need ImageMagick 7 with the matching support). Sources larger than
+        256 MiB are skipped; transparent areas become white
     - mov: array of strings, file types captured with ffmpeg, supported:
         vid-avi, vid-flv, vid-mkv, vid-mov, vid-mp4, vid-mpg, vid-ts, vid-vob, vid-webm, vid-wmv
     - doc: array of strings, file types captured with ImageMagick, supported:
@@ -400,7 +406,7 @@
     */
     "thumbnails": {
         "enabled": true,
-        "img": ["img-avif", "img-bmp", "img-gif", "img-heic", "img-ico", "img-jpg", "img-png", "img-webp"],
+        "img": ["img-avif", "img-bmp", "img-gif", "img-heic", "img-ico", "img-jp2", "img-jpg", "img-jxl", "img-png", "img-tga", "img-tiff", "img-webp", "x-psd"],
         "mov": ["vid-avi", "vid-flv", "vid-mkv", "vid-mov", "vid-mp4", "vid-mpg", "vid-webm"],
         "doc": ["x-pdf", "x-ps"],
         "delay": 1,

@@ -13,10 +13,11 @@ with a self-contained server that serves the files itself.
   sorting, filter and search
 - previews for images, audio, video (streamed with HTTP Range), text,
   Markdown and source code
-- thumbnails for images (JPEG, PNG, GIF, BMP, WebP; AVIF and HEIC with
-  ImageMagick; EXIF orientation aware), videos (ffmpeg) and PDF/PostScript
-  (ImageMagick), cached with a size limit (`thumbnails.maxCacheSize`) and,
-  if wanted, removed after some days without use (`thumbnails.maxCacheTime`)
+- thumbnails for images (JPEG, PNG, GIF, BMP, WebP; AVIF, HEIC, TIFF, PSD,
+  ICO, JPEG 2000, JPEG XL and TGA with ImageMagick; EXIF orientation
+  aware), videos (ffmpeg) and PDF/PostScript (ImageMagick), cached with a
+  size limit (`thumbnails.maxCacheSize`) and, if wanted, removed after some
+  days without use (`thumbnails.maxCacheTime`)
 - packaged downloads as tar or zip, streamed with limits
 - custom header and footer per folder, 35 languages, QR codes
 - admin page at `/-/admin` with login (bcrypt, rate limited)

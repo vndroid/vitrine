@@ -44,7 +44,7 @@ var (
 )
 
 var defaultCategoryTypes = map[string][]string{
-	"img": {"img-avif", "img-bmp", "img-gif", "img-heic", "img-ico", "img-jpg", "img-png", "img-webp"},
+	"img": {"img-avif", "img-bmp", "img-gif", "img-heic", "img-ico", "img-jp2", "img-jpg", "img-jxl", "img-png", "img-tga", "img-tiff", "img-webp", "x-psd"},
 	"mov": {"vid-avi", "vid-flv", "vid-mkv", "vid-mov", "vid-mp4", "vid-mpg", "vid-webm"},
 	"doc": {"x-pdf", "x-ps"},
 }
@@ -56,8 +56,18 @@ var movFormats = map[string]string{
 	"vid-webm": "matroska", "vid-wmv": "asf",
 }
 
-// file type => ImageMagick coder, for images Go can't decode
-var magickImages = map[string]string{"img-avif": "avif", "img-heic": "heic"}
+// file type => ImageMagick coder, for images Go can't decode (the types Go
+// decodes itself are bmp, gif, jpg, png and webp)
+var magickImages = map[string]string{
+	"img-avif": "avif", "img-heic": "heic", "img-ico": "ico", "img-jp2": "jp2",
+	"img-jxl": "jxl", "img-tga": "tga", "img-tiff": "tiff", "x-psd": "psd",
+}
+
+// Limits for ImageMagick, which reads formats that are far less simple than
+// the ones of Go: the size of the source and the resources of a conversion.
+const maxMagickSourceBytes = 256 << 20
+
+var magickLimits = []string{"-limit", "memory", "512MiB", "-limit", "map", "1GiB", "-limit", "disk", "2GiB", "-limit", "time", "50"}
 
 // file type => ImageMagick/GraphicsMagick coder
 var docFormats = map[string]string{"x-pdf": "pdf", "x-ps": "ps", "x-eps": "eps"}
@@ -255,18 +265,25 @@ func (s *Service) captureMov(fileType, src string) (string, bool) {
 	return s.capture(src, cmd("0:00:10", ""), cmd("0:00:00", ""))
 }
 
-// captureImage converts images Go can't decode (AVIF, HEIC) to JPEG with
-// ImageMagick; other images are used as they are.
+// captureImage converts images Go can't decode (AVIF, HEIC, ICO, JPEG 2000,
+// JPEG XL, TGA, TIFF, PSD) to JPEG with ImageMagick; other images are used as
+// they are. Transparent areas become white, CMYK is converted to sRGB.
 func (s *Service) captureImage(fileType, src string) (string, bool) {
 	format, ok := magickImages[fileType]
 	if !ok {
 		return src, true
 	}
+	if fi, err := os.Stat(src); err != nil || fi.Size() > maxMagickSourceBytes {
+		return "", false
+	}
+	// an explicit coder: the input is never auto-detected from its content
 	in := format + ":" + src + "[0]"
 	resize := fmt.Sprintf("%dx%d>", maxThumbDimension, maxThumbDimension)
-	args := []string{in, "-auto-orient", "-resize", resize, "-quality", "90", "-strip", "jpg:"}
+	args := append([]string{"magick"}, magickLimits...)
+	args = append(args, in, "-auto-orient", "-colorspace", "sRGB", "-background", "white", "-alpha", "remove", "-alpha", "off",
+		"-resize", resize, "-quality", "90", "-strip", "jpg:")
 	if s.hasCmd("magick") {
-		return s.capture(src, append([]string{"magick"}, args...))
+		return s.capture(src, args)
 	}
 	return "", false
 }
