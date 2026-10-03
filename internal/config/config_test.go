@@ -255,3 +255,22 @@ func TestConcurrentReload(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestImageFileTypes(t *testing.T) {
+	c := loadDefaults(t)
+	for name, want := range map[string]string{
+		"a.jpg": "img-jpg", "a.JPEG": "img-jpg", "a.jpe": "img-jpg", "a.jfif": "img-jpg",
+		"a.png": "img-png", "a.apng": "img-png", "a.gif": "img-gif", "a.bmp": "img-bmp",
+		"a.tif": "img-tiff", "a.TIFF": "img-tiff", "a.webp": "img-webp", "a.avif": "img-avif",
+		"a.heic": "img-heic", "a.HEIF": "img-heic", "a.ico": "img-ico", "a.svg": "img-svg",
+		"a.jp2": "img-jp2", "a.j2k": "img-jp2", "a.jxl": "img-jxl", "a.tga": "img-tga",
+		"a.psd": "x-psd", "a.cr2": "img-raw", "a.cr3": "img-raw", "a.nef": "img-raw",
+		"a.arw": "img-raw", "a.dng": "img-raw", "a.raf": "img-raw", "a.orf": "img-raw",
+		"a.rw2": "img-raw", "a.pef": "img-raw", "a.srw": "img-raw",
+		"jpg": "file", "a.jpgx": "file",
+	} {
+		if got := c.FileType(name); got != want {
+			t.Errorf("FileType(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
