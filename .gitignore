@@ -26,4 +26,5 @@ coverage.*
 /frontend/node_modules/
 
 # local assistant instructions, memory and settings (private: server address, rules)
-/.claude/
+.claude/
+.codex/
