@@ -4,6 +4,13 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.9 - 2026-10-27
+
+- update DOMPurify to 3.4.17 and rebuild the frontend to include upstream
+  sanitizer security fixes; update brace-expansion, source-map-js and
+  undici in the frontend tooling to fix denial-of-service and integrity
+  validation advisories
+
 ## 0.4.8 - 2026-10-03
 
 - thumbnails (and the samples of `preview-img.size`) for TIFF, PSD, ICO,

@@ -1,6 +1,6 @@
 {
   "name": "vitrine-frontend",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "private": true,
   "description": "Frontend of vitrine.",
   "homepage": "https://github.com/vndroid/vitrine",
@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.6.1",
-    "dompurify": "^3.4.16",
+    "dompurify": "^3.4.17",
     "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "eslint-plugin-es-x": "^10.0.1",
