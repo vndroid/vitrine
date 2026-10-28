@@ -4,6 +4,19 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.10 - 2026-10-28
+
+- update the Go modules golang.org/x/crypto 0.58, x/image 0.47, x/term 0.47
+  and x/sys 0.49; `go.mod` keeps naming only the minor version of Go
+  (`go 1.26.0`) and the builds use the latest patch release: CI now asks
+  for `1.26` instead of the exact version in `go.mod`, which fixes the
+  `crypto/x509` advisory GO-2026-6809 (Go 1.26.10) in the CI toolchain, the
+  Docker build already used the latest `golang:1.26`
+- update the frontend tooling and bundled libraries: marked 18.1.2,
+  jsdom 30.1.3, eslint 10.13, eslint-plugin-es-x 10.1, postcss 8.5.32,
+  autoprefixer 10.6.2 and glob 14 (the bundled script is rebuilt, the style
+  sheet is unchanged)
+
 ## 0.4.9 - 2026-10-27
 
 - update DOMPurify to 3.4.17 and rebuild the frontend to include upstream
