@@ -7,6 +7,7 @@ import (
 	"archive/zip"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -44,12 +45,14 @@ type Entry struct {
 	ModTime time.Time
 	Size    int64
 	IsDir   bool
+	info    fs.FileInfo // of the file when it was planned
 }
 
 // Plan lists the entries of a package.
 type Plan struct {
 	Entries []Entry
 	Bytes   int64
+	tr      *tree.Tree
 }
 
 type collector struct {
@@ -79,6 +82,7 @@ func Collect(tr *tree.Tree, baseHref string, hrefs []string, limits Limits) (*Pl
 		dirs: map[string]bool{}, files: map[string]bool{},
 		deadline: time.Now().Add(limits.ScanDuration),
 	}
+	c.plan.tr = tr
 
 	requested := 0
 	for _, href := range hrefs {
@@ -110,7 +114,7 @@ func (c *collector) addHref(href string) {
 	if err != nil || rel == "." || !filepath.IsLocal(rel) {
 		return
 	}
-	archived := filepath.ToSlash(rel)
+	archived := entryName(filepath.ToSlash(rel))
 	fi, err := os.Stat(real)
 	if err != nil {
 		return
@@ -120,6 +124,13 @@ func (c *collector) addHref(href string) {
 	} else {
 		c.addFile(real, archived)
 	}
+}
+
+// entryName makes a name safe for the package: a backslash is no character
+// of a path in a package, but some tools to unpack on Windows read it as a
+// separator, so a name like "..\\x" could leave the folder they unpack to.
+func entryName(name string) string {
+	return strings.ReplaceAll(name, `\`, "_")
 }
 
 func (c *collector) quotaExceeded() bool {
@@ -158,7 +169,7 @@ func (c *collector) addFile(real, archived string) {
 	c.nFiles++
 	c.plan.Bytes += fi.Size()
 	c.plan.Entries = append(c.plan.Entries, Entry{
-		Real: src, Name: archived, ModTime: fi.ModTime(), Size: fi.Size(),
+		Real: src, Name: archived, ModTime: fi.ModTime(), Size: fi.Size(), info: fi,
 	})
 }
 
@@ -191,7 +202,7 @@ func (c *collector) addDir(real, archived string, depth int) {
 			return
 		}
 		child := filepath.Join(real, name)
-		childName := path.Join(archived, name)
+		childName := path.Join(archived, entryName(name))
 		if fi, err := os.Stat(child); err == nil && fi.IsDir() {
 			c.addDir(child, childName, depth+1)
 		} else {
@@ -243,7 +254,7 @@ func (p *Plan) WriteTar(w io.Writer) error {
 			return err
 		}
 		if !e.IsDir {
-			if err := copyFile(tw, e); err != nil {
+			if err := p.copyFile(tw, e); err != nil {
 				return err
 			}
 		}
@@ -267,7 +278,7 @@ func (p *Plan) WriteZip(w io.Writer) error {
 			return err
 		}
 		if !e.IsDir {
-			if err := copyFile(fw, e); err != nil {
+			if err := p.copyFile(fw, e); err != nil {
 				return err
 			}
 		}
@@ -275,15 +286,21 @@ func (p *Plan) WriteZip(w io.Writer) error {
 	return zw.Close()
 }
 
+// errChanged means a file is not the one that was planned anymore.
+var errChanged = errors.New("archive: a file was replaced after the package was planned")
+
 // copyFile copies exactly the planned size, so a file that changed since
-// planning can't break the announced length.
-func copyFile(w io.Writer, e Entry) error {
-	f, err := os.Open(e.Real)
-	if err != nil {
-		return err
+// planning can't break the announced length. A package is written long after
+// it was planned, so the file is opened by the tree, which makes sure it is
+// still the planned file and does not leave the root: a file or folder
+// replaced by a symbolic link in between is not followed.
+func (p *Plan) copyFile(w io.Writer, e Entry) error {
+	f, ok := p.tr.OpenChecked(e.Real, e.info)
+	if !ok {
+		return errChanged
 	}
 	defer f.Close()
-	_, err = io.CopyN(w, f, e.Size)
+	_, err := io.CopyN(w, f, e.Size)
 	return err
 }
 

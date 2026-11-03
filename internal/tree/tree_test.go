@@ -190,14 +190,14 @@ func TestOpenCheckedRejectsSwappedFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f, ok := tr.openChecked(a, checked); ok {
+	if f, ok := tr.OpenChecked(a, checked); ok {
 		f.Close()
 		t.Error("a different file was opened")
 	}
 	// a folder link inside the path leads out of the root
 	outside := filepath.Join(filepath.Dir(root), "outside", "dir", "x.txt")
 	secret, _ := os.Stat(outside)
-	if f, ok := tr.openChecked(filepath.Join(root, "link-out", "x.txt"), secret); ok {
+	if f, ok := tr.OpenChecked(filepath.Join(root, "link-out", "x.txt"), secret); ok {
 		f.Close()
 		t.Error("a file behind a link leaving the root was opened")
 	}

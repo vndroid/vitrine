@@ -322,11 +322,15 @@ func (t *Tree) OpenManagedFile(path string) (*os.File, bool) {
 	if !ok {
 		return nil, false
 	}
-	return t.openChecked(real, fi)
+	return t.OpenChecked(real, fi)
 }
 
-// openChecked opens real and verifies it is the file described by checked.
-func (t *Tree) openChecked(real string, checked fs.FileInfo) (*os.File, bool) {
+// OpenChecked opens a file at a resolved real path (as ResolveManagedFile
+// returns it) and verifies that it is still the file described by checked,
+// which was taken when the file was checked. A file that was replaced since
+// (by a link, or one of its folders by a link) is not opened. Inside the
+// root the open cannot leave the root.
+func (t *Tree) OpenChecked(real string, checked fs.FileInfo) (*os.File, bool) {
 	var f *os.File
 	var err error
 	if rel, ok := t.relToRoot(real); ok {
@@ -370,7 +374,7 @@ func (t *Tree) OpenUnmanagedIndex(dir string) (*os.File, bool) {
 	if !ok {
 		return nil, false
 	}
-	return t.openChecked(real, fi)
+	return t.OpenChecked(real, fi)
 }
 
 func (t *Tree) resolveIndex(dir string) (string, fs.FileInfo, bool) {

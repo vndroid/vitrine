@@ -249,3 +249,108 @@ func TestCollectFollowSymlinks(t *testing.T) {
 		t.Errorf("entries = %s", got)
 	}
 }
+
+// A backslash in a name must not become a separator for a tool that
+// unpacks the package: the names of the package have none.
+func TestEntryNamesHaveNoBackslash(t *testing.T) {
+	tr := fixture(t)
+	root := tr.Root()
+	// folders are packaged with the names they hold; a selection by href
+	// with a backslash is refused by the tree
+	os.MkdirAll(filepath.Join(root, "pack"), 0o755)
+	os.WriteFile(filepath.Join(root, "pack", `up\..\..\evil.txt`), []byte("x"), 0o644)
+	os.MkdirAll(filepath.Join(root, "pack", `d\ir`), 0o755)
+	os.WriteFile(filepath.Join(root, "pack", `d\ir`, `a\b.txt`), []byte("y"), 0o644)
+
+	plan, err := Collect(tr, "/pack/", nil, DefaultLimits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Entries) != 3 {
+		t.Fatalf("entries = %s", names(plan))
+	}
+	for _, e := range plan.Entries {
+		if strings.Contains(e.Name, `\`) {
+			t.Errorf("entry %q has a backslash", e.Name)
+		}
+	}
+	if got := names(plan); !strings.Contains(got, "up_.._.._evil.txt") || !strings.Contains(got, "d_ir/a_b.txt") {
+		t.Errorf("entries = %s", got)
+	}
+	var zipped, tarred bytes.Buffer
+	if err := plan.WriteZip(&zipped); err != nil {
+		t.Fatal(err)
+	}
+	zr, _ := zip.NewReader(bytes.NewReader(zipped.Bytes()), int64(zipped.Len()))
+	for _, f := range zr.File {
+		if strings.Contains(f.Name, `\`) {
+			t.Errorf("zip entry %q has a backslash", f.Name)
+		}
+	}
+	if err := plan.WriteTar(&tarred); err != nil {
+		t.Fatal(err)
+	}
+	tr2 := tar.NewReader(&tarred)
+	for h, err := tr2.Next(); err == nil; h, err = tr2.Next() {
+		if strings.Contains(h.Name, `\`) {
+			t.Errorf("tar entry %q has a backslash", h.Name)
+		}
+	}
+}
+
+// A package is written long after the plan was made (a download may take
+// hours): a file or a folder replaced by a symbolic link in between must not
+// put the file it points to into the package.
+func TestWriteIgnoresSwappedFiles(t *testing.T) {
+	for _, format := range []string{"tar", "zip"} {
+		t.Run(format, func(t *testing.T) {
+			tr := fixture(t)
+			root := tr.Root()
+			outside := filepath.Join(filepath.Dir(root), "outside")
+			os.WriteFile(filepath.Join(outside, "big-secret.txt"), []byte(strings.Repeat("TOPSECRET", 200)), 0o644)
+
+			plan, err := Collect(tr, "/", []string{"/a.txt", "/dir/b.txt"}, DefaultLimits)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// the file is replaced by a link to a file outside of the root,
+			// and the folder of the other file by a link to a folder with a
+			// file of the same name
+			os.Remove(filepath.Join(root, "a.txt"))
+			os.Symlink(filepath.Join(outside, "big-secret.txt"), filepath.Join(root, "a.txt"))
+			os.WriteFile(filepath.Join(outside, "b.txt"), []byte(strings.Repeat("OTHERSECRET", 200)), 0o644)
+			os.RemoveAll(filepath.Join(root, "dir"))
+			os.Symlink(outside, filepath.Join(root, "dir"))
+
+			var out bytes.Buffer
+			if format == "tar" {
+				err = plan.WriteTar(&out)
+			} else {
+				err = plan.WriteZip(&out)
+			}
+			if strings.Contains(out.String(), "SECRET") {
+				t.Errorf("the package contains files from outside of the root (write error: %v)", err)
+			}
+			if err == nil {
+				t.Error("writing a package whose files were swapped should fail")
+			}
+		})
+	}
+}
+
+// A file that is only rewritten in place is still packaged.
+func TestWriteAcceptsRewrittenFiles(t *testing.T) {
+	tr := fixture(t)
+	plan, err := Collect(tr, "/", []string{"/a.txt"}, DefaultLimits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(tr.Root(), "a.txt"), []byte("HELLO"), 0o644) // same size, same file
+	var out bytes.Buffer
+	if err := plan.WriteTar(&out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "HELLO") {
+		t.Error("a file rewritten in place was not packaged")
+	}
+}
