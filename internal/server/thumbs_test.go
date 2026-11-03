@@ -85,3 +85,63 @@ func TestThumbsLimits(t *testing.T) {
 		t.Error("thumbnails after the deadline must be null")
 	}
 }
+
+func thumbHref(t *testing.T, s *Server, href string) string {
+	t.Helper()
+	res := post(t, s, `{"action":"get","thumbs":[{"type":"img","href":"`+href+`","width":240,"height":240}]}`)
+	thumb := res["thumbs"].([]any)[0]
+	if thumb == nil {
+		t.Fatalf("no thumbnail for %s", href)
+	}
+	return thumb.(string)
+}
+
+// The address of a cached thumbnail is handed to every client, and the
+// cache outlives the source: once the source is gone, hidden or in a folder
+// that is not listed anymore, the thumbnail is not served anymore either.
+func TestThumbnailIsServedOnlyWhileTheSourceMayBeServed(t *testing.T) {
+	s, root := newTestServer(t, fixtureOpts{})
+	var buf bytes.Buffer
+	png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 64, 48)))
+	for _, name := range []string{"gone.png", "renamed.png", "stays.png", "sub/in-folder.png"} {
+		os.WriteFile(filepath.Join(root, name), buf.Bytes(), 0o644)
+	}
+	hrefs := map[string]string{}
+	for _, name := range []string{"gone.png", "renamed.png", "stays.png", "sub/in-folder.png"} {
+		hrefs[name] = thumbHref(t, s, "/"+name)
+		if rec := do(s, "GET", hrefs[name], "", nil); rec.Code != 200 {
+			t.Fatalf("%s: thumbnail = %d", name, rec.Code)
+		}
+	}
+
+	os.Remove(filepath.Join(root, "gone.png"))
+	os.Rename(filepath.Join(root, "renamed.png"), filepath.Join(root, ".renamed.png")) // hidden now
+	os.WriteFile(filepath.Join(root, "sub", "index.html"), []byte("x"), 0o644)         // "sub" is not listed anymore
+
+	for name, want := range map[string]int{"gone.png": 404, "renamed.png": 404, "sub/in-folder.png": 404, "stays.png": 200} {
+		if rec := do(s, "GET", hrefs[name], "", nil); rec.Code != want {
+			t.Errorf("%s: thumbnail = %d, want %d", name, rec.Code, want)
+		}
+	}
+}
+
+// A server that was just started serves a thumbnail from the cache once the
+// client asked for it again (the page does so every time a folder is shown).
+func TestThumbnailAfterARestart(t *testing.T) {
+	s, root := newTestServer(t, fixtureOpts{})
+	var buf bytes.Buffer
+	png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 64, 48)))
+	os.WriteFile(filepath.Join(root, "pic.png"), buf.Bytes(), 0o644)
+	href := thumbHref(t, s, "/pic.png")
+
+	s.thumb.ForgetSources() // what a restart does
+	if rec := do(s, "GET", href, "", nil); rec.Code != 404 {
+		t.Errorf("an address nobody asked for since the start = %d, want 404", rec.Code)
+	}
+	if again := thumbHref(t, s, "/pic.png"); again != href {
+		t.Errorf("the address changed: %s -> %s", href, again)
+	}
+	if rec := do(s, "GET", href, "", nil); rec.Code != 200 {
+		t.Errorf("after the client asked again = %d, want 200", rec.Code)
+	}
+}

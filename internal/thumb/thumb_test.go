@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -729,5 +730,71 @@ func TestMagickTransparencyIsWhite(t *testing.T) {
 	r, g, b, _ := img.At(10, 10).RGBA()
 	if r>>8 < 240 || g>>8 < 240 || b>>8 < 240 {
 		t.Errorf("transparent pixel is (%d,%d,%d), want white", r>>8, g>>8, b>>8)
+	}
+}
+
+// A thumbnail is only served while its source may be, see Allowed.
+func TestAllowedFollowsTheSource(t *testing.T) {
+	s, root := service(t, "")
+	name, ok := s.Thumb("img", "/a.png", 240, 240)
+	if !ok {
+		t.Fatal("no thumbnail")
+	}
+	if !s.Allowed(name) {
+		t.Error("the thumbnail of a listed file must be allowed")
+	}
+	if s.Allowed("thumb-" + strings.Repeat("0", 56) + "-240x240.jpg") {
+		t.Error("an unknown thumbnail must not be allowed")
+	}
+	if err := os.Rename(filepath.Join(root, "a.png"), filepath.Join(root, ".a.png")); err != nil {
+		t.Fatal(err)
+	}
+	if s.Allowed(name) {
+		t.Error("the thumbnail of a file that is hidden now must not be allowed")
+	}
+	os.Rename(filepath.Join(root, ".a.png"), filepath.Join(root, "a.png"))
+	if !s.Allowed(name) {
+		t.Error("the thumbnail is allowed again once the file is back")
+	}
+	s.ForgetSources()
+	if s.Allowed(name) {
+		t.Error("nothing is allowed after the sources were forgotten")
+	}
+	if again, _ := s.Thumb("img", "/a.png", 240, 240); again != name || !s.Allowed(name) {
+		t.Error("asking for the thumbnail again allows it")
+	}
+}
+
+// Thumbnails that leave the cache are forgotten with their sources.
+func TestRemovedThumbnailsAreForgotten(t *testing.T) {
+	s, _ := service(t, `{"thumbnails": {"maxCacheTime": 1}}`)
+	name, ok := s.Thumb("img", "/a.png", 240, 240)
+	if !ok {
+		t.Fatal("no thumbnail")
+	}
+	file, _ := s.Path(name)
+	old := time.Now().Add(-3 * 24 * time.Hour)
+	os.Chtimes(file, old, old)
+	if n := s.Expire(time.Now()); n != 1 {
+		t.Fatalf("Expire removed %d files", n)
+	}
+	s.sourcesMu.Lock()
+	_, kept := s.sources[name]
+	s.sourcesMu.Unlock()
+	if kept {
+		t.Error("the source of an expired thumbnail is still remembered")
+	}
+}
+
+func TestSourcesAreBounded(t *testing.T) {
+	s, _ := service(t, "")
+	for i := 0; i < maxSources+5; i++ {
+		s.remember("n"+strconv.Itoa(i), "/x")
+	}
+	s.sourcesMu.Lock()
+	n := len(s.sources)
+	s.sourcesMu.Unlock()
+	if n > maxSources {
+		t.Errorf("%d sources are remembered, the limit is %d", n, maxSources)
 	}
 }

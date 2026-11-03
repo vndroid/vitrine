@@ -87,7 +87,17 @@ type Service struct {
 	usageMu    sync.Mutex
 	usage      int64
 	usageKnown bool
+
+	// the file each served thumbnail was made of (the requested path), so a
+	// thumbnail is only served while its source still may be: the cache
+	// outlives deleted, hidden and no longer listed files
+	sourcesMu sync.Mutex
+	sources   map[string]string
 }
+
+// maxSources bounds the sources that are remembered; the list refills as
+// clients ask for thumbnails again.
+const maxSources = 200000
 
 // New creates the service; thumbnails are stored in cacheDir/thumbs.
 func New(tr *tree.Tree, cfg *config.Config, cacheDir string, hasCmd func(string) bool, log *slog.Logger) (*Service, error) {
@@ -146,7 +156,50 @@ func (s *Service) Thumb(typ, href string, width, height int) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return s.thumb(src, width, height)
+	name, ok := s.thumb(src, width, height)
+	if ok {
+		s.remember(name, requested)
+	}
+	return name, ok
+}
+
+// remember notes the file a thumbnail was made of.
+func (s *Service) remember(name, requested string) {
+	s.sourcesMu.Lock()
+	defer s.sourcesMu.Unlock()
+	if s.sources == nil || len(s.sources) >= maxSources {
+		s.sources = map[string]string{}
+	}
+	s.sources[name] = requested
+}
+
+// forget drops the source of a thumbnail that was removed from the cache.
+func (s *Service) forget(name string) {
+	s.sourcesMu.Lock()
+	delete(s.sources, name)
+	s.sourcesMu.Unlock()
+}
+
+// ForgetSources drops all remembered sources, as a restart does: the
+// thumbnails of the cache are served again once a client asked for them.
+func (s *Service) ForgetSources() {
+	s.sourcesMu.Lock()
+	s.sources = nil
+	s.sourcesMu.Unlock()
+}
+
+// Allowed reports whether a cached thumbnail may be served: a client asked
+// for it since the start and its source still passes the checks that were
+// made when the thumbnail was created.
+func (s *Service) Allowed(name string) bool {
+	s.sourcesMu.Lock()
+	requested, ok := s.sources[name]
+	s.sourcesMu.Unlock()
+	if !ok || s.tree.IsHidden(filepath.Base(requested)) {
+		return false
+	}
+	_, ok = s.tree.ResolveManagedFile(requested)
+	return ok
 }
 
 func validDimensions(w, h int) bool {
@@ -401,6 +454,7 @@ func (s *Service) Expire(now time.Time) int {
 	for _, f := range s.cacheFiles() {
 		if f.mtime.Before(cutoff) && os.Remove(f.path) == nil {
 			s.usage = max(0, s.usage-f.size)
+			s.forget(filepath.Base(f.path))
 			removed++
 		}
 	}
@@ -502,6 +556,7 @@ func (s *Service) cleanup() int64 {
 		}
 		if os.Remove(f.path) == nil {
 			usage -= f.size
+			s.forget(filepath.Base(f.path))
 		}
 	}
 	return usage

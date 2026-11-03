@@ -86,7 +86,7 @@ func (s *Server) serveThumb(w http.ResponseWriter, r *http.Request, name string)
 		return
 	}
 	p, ok := s.thumb.Path(name)
-	if !ok {
+	if !ok || !s.cfg.Bool("thumbnails.enabled", false) || !s.thumb.Allowed(name) {
 		s.notFound(w)
 		return
 	}
