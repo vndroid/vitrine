@@ -33,6 +33,16 @@ func ParseTrustedProxies(list string) ([]netip.Prefix, error) {
 	return prefixes, nil
 }
 
+// hasProxyHeaders reports whether a request has the headers of a proxy.
+func hasProxyHeaders(r *http.Request) bool {
+	for _, h := range []string{"X-Real-IP", "X-Forwarded-For", "X-Forwarded-Proto"} {
+		if r.Header.Get(h) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // client describes who sent a request, after trusted proxies.
 type client struct {
 	addr  netip.Addr
@@ -62,6 +72,12 @@ func (s *Server) clientOf(r *http.Request) client {
 		return c
 	}
 	c.addr = peer.Unmap()
+	if len(s.trusted) == 0 && hasProxyHeaders(r) {
+		s.proxyWarning.Do(func() {
+			s.log.Warn("a request carries X-Real-IP, X-Forwarded-For or X-Forwarded-Proto, but no trusted proxy is set (-trusted-proxy): " +
+				"the headers are ignored, so client addresses (login and download limits) and the Secure flag of the session cookie are those of the proxy")
+		})
+	}
 	if !s.isTrusted(c.addr) {
 		return c
 	}

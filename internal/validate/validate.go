@@ -285,6 +285,8 @@ func (v *validator) passhash(n *node) {
 	h := strings.TrimSpace(n.value.(string))
 	switch {
 	case h == "":
+	case auth.IsWeakPasswordHash(h):
+		v.add(n, Warning, "passhash", "unsalted SHA512 hash: it can be guessed offline very fast, create a bcrypt hash with \"vitrine passwd\"")
 	case auth.LoginEnabled(h):
 	case auth.IsEmptyPasswordHash(h):
 		v.add(n, Warning, "passhash", "hash of the empty password: the login is disabled")

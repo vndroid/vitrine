@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/vndroid/vitrine/internal/archive"
@@ -86,6 +87,8 @@ type Server struct {
 	trusted   []netip.Prefix
 	log       *slog.Logger
 	commands  atomic.Pointer[map[string]bool]
+	// proxyWarning logs once that proxy headers come without a trusted proxy
+	proxyWarning sync.Once
 	// rootCheck tests that the shared folder is accessible; readyBusy is
 	// set while a check runs, readyState remembers the last answer
 	rootCheck  func() error

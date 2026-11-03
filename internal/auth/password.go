@@ -40,6 +40,13 @@ func LoginEnabled(hash string) bool {
 	return isBcrypt(hash) || argon2Re.MatchString(hash) || sha512HexRe.MatchString(hash)
 }
 
+// IsWeakPasswordHash reports whether hash is a plain SHA512 hex digest: it
+// has no salt and one round, so it can be guessed offline very fast. It is
+// still accepted for old configurations.
+func IsWeakPasswordHash(hash string) bool {
+	return sha512HexRe.MatchString(strings.TrimSpace(hash)) && !IsEmptyPasswordHash(hash)
+}
+
 // IsEmptyPasswordHash reports whether hash is the SHA512 of the empty
 // password, the former h5fs preset that disables the login.
 func IsEmptyPasswordHash(hash string) bool {

@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -377,6 +378,44 @@ func TestFormParams(t *testing.T) {
 	}
 	if q, _ := p.str("q"); q != "1" {
 		t.Errorf("query param = %q", q)
+	}
+}
+
+// Headers of a proxy without a trusted proxy are ignored; the one warning
+// tells why the client addresses are those of the proxy.
+func TestProxyHeadersWithoutATrustedProxyAreReported(t *testing.T) {
+	logs := &logBuffer{}
+	s, _ := newTestServer(t, fixtureOpts{})
+	s.log = slog.New(slog.NewJSONHandler(logs, nil))
+	plain := httptest.NewRequest("GET", "/", nil)
+	plain.RemoteAddr = "203.0.113.9:1234"
+	s.clientOf(plain)
+	if n := len(logs.entries(t)); n != 0 {
+		t.Fatalf("a request without proxy headers logged %d entries", n)
+	}
+	for _, header := range []string{"X-Forwarded-Proto", "X-Real-IP", "X-Forwarded-For"} {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = "203.0.113.9:1234"
+		req.Header.Set(header, "https")
+		if c := s.clientOf(req); c.addr.String() != "203.0.113.9" || c.https {
+			t.Errorf("%s was not ignored: %s https=%v", header, c.addr, c.https)
+		}
+	}
+	entries := logs.entries(t)
+	if len(entries) != 1 || entries[0]["level"] != "WARN" || !strings.Contains(entries[0]["msg"].(string), "-trusted-proxy") {
+		t.Errorf("expected one warning about -trusted-proxy, got %v", entries)
+	}
+
+	// with a trusted proxy configured there is nothing to warn about
+	logs2 := &logBuffer{}
+	t2, _ := newTestServer(t, fixtureOpts{trusted: "10.0.0.1"})
+	t2.log = slog.New(slog.NewJSONHandler(logs2, nil))
+	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "203.0.113.9:1234"
+	req.Header.Set("X-Forwarded-For", "1.2.3.4")
+	t2.clientOf(req)
+	if n := len(logs2.entries(t)); n != 0 {
+		t.Errorf("a configured trusted proxy logged %d entries", n)
 	}
 }
 

@@ -116,6 +116,9 @@ func TestPasshashes(t *testing.T) {
 		"":                                  "",
 		"$2a$12$" + strings.Repeat("a", 53): "",
 		"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e": "warning: passhash: hash of the empty password",
+		// SHA512 of "x": still accepted, but weak
+		"a4abd4448c49562d828115d13a1fccea927f52b4d5459297f8b43e42da89238bc13626e43dcb38ddb082488927ec904fb42057443983e88585179d50551afe62": "warning: passhash: unsalted SHA512 hash",
+		"A4ABD4448C49562D828115D13A1FCCEA927F52B4D5459297F8B43E42DA89238BC13626E43DCB38DDB082488927EC904FB42057443983E88585179D50551AFE62": "warning: passhash: unsalted SHA512 hash",
 	} {
 		got := short(check(t, map[string]string{"options.json": `{"passhash": "` + hash + `"}`}))
 		if want == "" && got != "" || want != "" && !strings.Contains(got, want) {
