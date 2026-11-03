@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
 	"io/fs"
 	"mime"
 	"net/http"
@@ -107,11 +108,45 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, f *os.File) {
 	}
 	ext := strings.ToLower(filepath.Ext(f.Name()))
 	h := w.Header()
+	ct := mime.TypeByExtension(ext)
 	switch {
 	case plainTypes[ext]:
-		h.Set("Content-Type", "text/plain; charset=utf-8")
-	case activeTypes[ext]:
+		ct = "text/plain; charset=utf-8"
+	case ct == "":
+		// no known type (.md, no extension, ...): ServeContent would sniff
+		// the content, and a file starting with "<!DOCTYPE html>" would be
+		// a page of the origin of vitrine. The type is set here instead.
+		ct = sniffedType(f)
+	}
+	h.Set("Content-Type", ct)
+	if activeTypes[ext] || isActiveType(ct) {
 		h.Set("Content-Security-Policy", "sandbox; "+frameAncestors)
 	}
 	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
+}
+
+// isActiveType reports whether a browser opens the type as a document that
+// can run scripts: HTML, XHTML, SVG and the XML types.
+func isActiveType(ct string) bool {
+	mt, _, err := mime.ParseMediaType(ct)
+	if err != nil {
+		return false
+	}
+	return mt == "text/html" || mt == "text/xml" || mt == "text/xsl" ||
+		mt == "application/xml" || strings.HasSuffix(mt, "+xml")
+}
+
+// sniffedType is the type of the content of a file without a known
+// extension, like http.ServeContent finds it, except that content which a
+// browser would open as a document (HTML, XML) is plain text. The file is
+// left at its start.
+func sniffedType(f *os.File) string {
+	var head [512]byte
+	n, _ := io.ReadFull(f, head[:])
+	f.Seek(0, io.SeekStart)
+	ct := http.DetectContentType(head[:n])
+	if isActiveType(ct) {
+		return "text/plain; charset=utf-8"
+	}
+	return ct
 }
