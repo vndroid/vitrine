@@ -16,3 +16,15 @@ test('util.renderCustomHtml()', () => {
     assert.ok(!markdown.includes(unsafeUrl), 'sanitizes Markdown URLs');
     assert.ok(!markdown.includes('<script'), 'sanitizes embedded Markdown HTML');
 });
+
+test('util.renderCustomHtml() keeps inline styles of HTML, not of Markdown', () => {
+    const dirty = '<div style="text-align:center" id="x">centered</div><style>body{display:none}</style>';
+
+    const html = renderCustomHtml(dirty, 'html');
+    assert.ok(html.includes('style="text-align:center"'), 'a custom HTML header can be styled inline');
+    assert.ok(!html.includes('<style') && !html.includes('id="x"'), 'but has no style element and no id');
+
+    const markdown = renderCustomHtml(dirty.replace('centered', 'centered\n'), 'md');
+    assert.ok(!markdown.includes('style'), 'Markdown has no styles at all');
+    assert.ok(markdown.includes('centered'), 'but keeps its text');
+});

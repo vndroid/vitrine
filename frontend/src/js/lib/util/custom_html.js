@@ -5,7 +5,9 @@ const {sanitizeHtml} = sanitizer;
 
 const render_custom_html = (content, type) => {
     const html = type === 'md' ? marked.parse(content) : content;
-    return sanitizeHtml(html);
+    // inline styles are allowed in a custom header or footer of HTML, not in
+    // markdown
+    return sanitizeHtml(html, type === 'md');
 };
 
 export default {
