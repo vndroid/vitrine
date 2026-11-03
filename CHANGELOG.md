@@ -4,6 +4,36 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.11 - 2026-11-03
+
+Security fixes:
+
+- a shared file whose extension has no known type (`.md`, `.markdown`, no
+  extension, ...) and whose content starts like HTML was sent as `text/html`
+  by the sniffing of the Go library, so a script in such a file ran on the
+  origin of vitrine. The type of such a file is now chosen by vitrine and
+  content that looks like HTML or XML is sent as plain text; the files that
+  are documents by their type (HTML, SVG, XML and every `+xml` type) keep
+  the `Content-Security-Policy: sandbox`
+- packaged downloads open the files through the tree again, like single
+  files: a file, or a folder of it, replaced by a symbolic link after the
+  package was planned is no longer followed (the download fails instead)
+- a cached thumbnail is only served while its source may be served (not
+  deleted, hidden, or in a folder that is not listed anymore); after a restart
+  it is served again once a client asked for it
+- `foldersize.type` `shell-du` runs `du` without `-L`, so the sizes do not
+  include what symbolic links point to
+- names in a package have no backslash (replaced by `_`)
+- Markdown and custom headers are sanitized without style elements, `id` and
+  `name` attributes, and Markdown without style attributes
+- `vitrine validate` warns about an unsalted SHA512 `passhash` (still
+  accepted); the log has one warning when requests carry proxy headers but no
+  trusted proxy is set (client addresses and the Secure cookie flag are then
+  those of the proxy)
+- frontend tooling: eslint 10.14, marked 18.1.3. `npm audit` lists 6 moderate
+  advisories of `minimatch` in the dependencies of eslint, which only runs
+  when linting and is not part of the bundled script
+
 ## 0.4.10 - 2026-10-28
 
 - update the Go modules golang.org/x/crypto 0.58, x/image 0.47, x/term 0.47

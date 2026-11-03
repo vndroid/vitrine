@@ -185,7 +185,21 @@ Then run `vitrine validate -config <dir>` to check it. Notes:
   path below the root and, for targets inside the root, to the target;
   links to the cache or config folder are never served.
 - Shared HTML, SVG and XML files are served with
-  `Content-Security-Policy: sandbox`, PHP files as plain text.
+  `Content-Security-Policy: sandbox`, PHP files as plain text. The type of
+  a file is never taken from its content as a page: a file without a known
+  extension (`.md`, no extension, ...) that looks like HTML or XML is sent as
+  plain text.
+- A file is opened once after the checks and has to be the checked file,
+  also in packaged downloads (which can run for hours): a file or folder that
+  was replaced by a symbolic link in between is not followed. The names in a
+  package have no backslash.
+- A cached thumbnail is only served while its source may be served: when the
+  file is deleted, hidden or in a folder that is not listed anymore, the
+  thumbnail is gone too. After a restart a thumbnail is served again once the
+  page asked for it, as it does every time a folder is shown.
+- The text of Markdown files and custom headers is sanitized (DOMPurify)
+  without style elements, `id` and `name` attributes; Markdown also without
+  style attributes.
 - The cache and config folders are never served, even inside the root.
 - Every response carries `X-Powered-By: vitrine/<version>`, with the
   version of the program. It tells the world which version runs; see
