@@ -258,11 +258,17 @@ func walkSize(path string) *int64 {
 	return &total
 }
 
-// duSize runs "du -sbL" (GNU coreutils) like h5fs.
+// duSize runs "du -sb" (GNU coreutils). Symbolic links inside the folder are
+// not followed ("-L" would add the size of what they point to, also outside
+// of the root and in hidden folders, to a size every visitor sees); the
+// folder itself may be a link, like for walkSize.
 func duSize(path string) *int64 {
 	ctx, cancel := context.WithTimeout(context.Background(), folderSizeTimeout)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "du", "-sbL", "--", path).Output()
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
+	out, err := exec.CommandContext(ctx, "du", "-sb", "--", path).Output()
 	if err != nil {
 		return nil
 	}
