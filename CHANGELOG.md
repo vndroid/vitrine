@@ -4,6 +4,19 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.12 - 2026-11-08
+
+Security fixes:
+
+- a `view.hidden` pattern that does not compile (for example a PCRE
+  lookahead like `^passwd(?!\.local2)`, which RE2 does not support) was
+  skipped, so what it was meant to hide was listed and served. The
+  configuration is now refused instead: vitrine does not start, and a
+  reload with such a pattern keeps the current configuration
+- a visible symbolic link to a hidden (or excluded) target inside the
+  share showed the size, time and type of the target in the listing; it
+  now shows its own metadata
+
 ## 0.4.11 - 2026-11-03
 
 Security fixes:
