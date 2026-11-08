@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vndroid/vitrine/internal/config"
 	"github.com/vndroid/vitrine/web"
@@ -479,6 +480,34 @@ func TestReservedName(t *testing.T) {
 	for _, it := range tr.Items("/", 1) {
 		if it.Href == "/-/" {
 			t.Error("items lists /-/")
+		}
+	}
+}
+
+// A visible link to a hidden target must not show the metadata of the
+// target in the listing.
+func TestLinkToHiddenShowsOwnMetadata(t *testing.T) {
+	tr, root := fixture(t)
+	for name, target := range map[string]string{
+		"link-to-hidden-file": "sub/.hidden/c.txt",
+		"link-to-hidden-dir":  "sub/.hidden",
+	} {
+		if err := os.Symlink(target, filepath.Join(root, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
+	os.Chtimes(filepath.Join(root, "sub/.hidden/c.txt"), old, old)
+	for _, it := range tr.Items("/", 1) {
+		switch it.Href {
+		case "/link-to-hidden-file", "/link-to-hidden-dir", "/link-to-hidden-dir/":
+			if it.ModTime.Equal(old) || it.IsFolder || it.Managed {
+				t.Errorf("%s shows the target: folder=%v time=%v", it.Href, it.IsFolder, it.ModTime)
+			}
+		case "/link-in/":
+			if !it.IsFolder {
+				t.Error("a link to a visible folder must stay a folder")
+			}
 		}
 	}
 }

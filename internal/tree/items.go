@@ -64,7 +64,7 @@ func (t *Tree) item(path string, cache itemCache) *Item {
 		return it
 	}
 	it := &Item{Path: path}
-	if fi, err := os.Stat(path); err == nil {
+	if fi, err := t.statItem(path); err == nil {
 		it.IsFolder = fi.IsDir()
 		it.ModTime = fi.ModTime()
 		if !it.IsFolder {
@@ -79,6 +79,21 @@ func (t *Tree) item(path string, cache itemCache) *Item {
 	}
 	cache[path] = it
 	return it
+}
+
+// statItem returns the metadata shown in a listing. A link whose target
+// is inside the root but hidden or excluded shows its own metadata: the
+// size and time of the target would publish what the rules hide.
+func (t *Tree) statItem(path string) (fs.FileInfo, error) {
+	li, err := os.Lstat(path)
+	if err != nil || li.Mode()&os.ModeSymlink == 0 {
+		return os.Stat(path)
+	}
+	if real, err := filepath.EvalSymlinks(path); err == nil && within(real, t.root) &&
+		(t.isExcluded(real) || !t.visiblePath(real)) {
+		return li, nil
+	}
+	return os.Stat(path)
 }
 
 func (t *Tree) parent(it *Item, cache itemCache) *Item {
