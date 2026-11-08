@@ -134,7 +134,7 @@ func hiddenPatterns(v *validator, n *node, path string) {
 		if s, ok := item.value.(string); ok {
 			if err := compilePattern(s); err != nil {
 				v.add(item, Error, fmt.Sprintf("%s[%d]", path, i),
-					"pattern %q is not supported (RE2 syntax: no lookarounds or backreferences), it is ignored: %v", s, err)
+					"pattern %q is not supported (RE2 syntax: no lookarounds or backreferences), vitrine refuses to start with it: %v", s, err)
 			}
 		}
 	}
