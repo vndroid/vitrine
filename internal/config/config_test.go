@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"testing/fstest"
@@ -120,7 +121,7 @@ func TestOverrideDir(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "options.json"), []byte(`{
 		// comment
 		"passhash": " $2y$10$abc ",
-		"view": {"hidden": ["^secret", "(a)\\1"]},
+		"view": {"hidden": ["^secret"]},
 		"download": {"enabled": 1, "maxConcurrent": "8"}
 	}`), 0o600)
 	os.MkdirAll(filepath.Join(dir, "l10n"), 0o755)
@@ -272,5 +273,16 @@ func TestImageFileTypes(t *testing.T) {
 		if got := c.FileType(name); got != want {
 			t.Errorf("FileType(%q) = %q, want %q", name, got, want)
 		}
+	}
+}
+
+// A hidden pattern that does not compile (a PCRE lookahead) must stop the
+// load: skipping it would publish the files it was meant to hide.
+func TestBadHiddenPatternFails(t *testing.T) {
+	dir := t.TempDir()
+	opts := filepath.Join(dir, "options.json")
+	os.WriteFile(opts, []byte(`{"view": {"hidden": ["^passwd(?!\\.local2)"]}}`), 0o600)
+	if _, err := Load(dir, web.Conf()); err == nil || !strings.Contains(err.Error(), "view.hidden") {
+		t.Fatalf("Load = %v, want a view.hidden error", err)
 	}
 }

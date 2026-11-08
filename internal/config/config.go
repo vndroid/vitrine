@@ -137,7 +137,8 @@ func (c *Config) load() (*snapshot, error) {
 	for _, p := range stringList(s, "view.hidden") {
 		re, err := pattern.Compile(p, false)
 		if err != nil {
-			continue // reported by the config validation
+			// a pattern that is skipped would publish what it hides
+			return nil, fmt.Errorf("view.hidden: %w", err)
 		}
 		s.hidden = append(s.hidden, re)
 	}
