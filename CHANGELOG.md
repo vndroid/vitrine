@@ -4,6 +4,18 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.13 - 2026-11-21
+
+Dependencies:
+
+- built with Go 1.26.11, which fixes GO-2026-6859 (a crash of the HTTP/1
+  server when `MaxBytesReader` races with a header write). vitrine does
+  not use `MaxBytesReader`, so it was not affected, but the published
+  0.4.12 image was built with Go 1.26.10
+- golang.org/x/crypto 0.59.0 (drops the unmaintained `openpgp` package,
+  GO-2026-5932, which vitrine never imported), golang.org/x/image 0.48.0,
+  golang.org/x/term 0.48.0, golang.org/x/sys 0.50.0
+
 ## 0.4.12 - 2026-11-08
 
 Security fixes:
