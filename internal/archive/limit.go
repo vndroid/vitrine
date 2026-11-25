@@ -49,13 +49,14 @@ func (s *Slots) Acquire(client string, maxConcurrent, maxPerClient int) (release
 var ErrTooSlow = errors.New("archive: download too slow or too long")
 
 // RateWriter enforces the maximum duration and the minimum rate of a
-// download. Writes block while the client does not read, so the elapsed
-// time reflects the client's reading speed.
+// download. SetWriteDeadline can also stop a write while the client is
+// still blocking it.
 type RateWriter struct {
-	W           io.Writer
-	MaxDuration time.Duration
-	MinRate     int64 // bytes per second, 0 disables
-	Grace       time.Duration
+	W                io.Writer
+	MaxDuration      time.Duration
+	MinRate          int64 // bytes per second, 0 disables
+	Grace            time.Duration
+	SetWriteDeadline func(time.Time) error
 
 	start time.Time
 	n     int64
@@ -68,6 +69,20 @@ func (r *RateWriter) Write(p []byte) (int, error) {
 	}
 	if r.start.IsZero() {
 		r.start = r.now()
+	}
+	if r.SetWriteDeadline != nil {
+		budget := r.MaxDuration
+		if r.MinRate > 0 && r.Grace < budget {
+			// Allow the time to send this chunk, in addition to the grace
+			// period and the time earned by bytes already sent.
+			seconds := float64(r.n+int64(len(p))) / float64(r.MinRate)
+			if seconds < (budget - r.Grace).Seconds() {
+				budget = r.Grace + time.Duration(seconds*float64(time.Second))
+			}
+		}
+		if err := r.SetWriteDeadline(r.start.Add(budget)); err != nil {
+			return 0, err
+		}
 	}
 	n, err := r.W.Write(p)
 	r.n += int64(n)

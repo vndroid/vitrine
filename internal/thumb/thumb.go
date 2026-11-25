@@ -4,10 +4,9 @@ package thumb
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"log/slog"
 	"math"
 	"os"
@@ -65,7 +64,10 @@ var magickImages = map[string]string{
 
 // Limits for ImageMagick, which reads formats that are far less simple than
 // the ones of Go: the size of the source and the resources of a conversion.
-const maxMagickSourceBytes = 256 << 20
+const (
+	maxMagickSourceBytes   = 256 << 20
+	maxExternalSourceBytes = 1 << 30
+)
 
 var magickLimits = []string{"-limit", "memory", "512MiB", "-limit", "map", "1GiB", "-limit", "disk", "2GiB", "-limit", "time", "50"}
 
@@ -92,7 +94,13 @@ type Service struct {
 	// thumbnail is only served while its source still may be: the cache
 	// outlives deleted, hidden and no longer listed files
 	sourcesMu sync.Mutex
-	sources   map[string]string
+	sources   map[string]thumbSource
+}
+
+type thumbSource struct {
+	requested string
+	real      string
+	info      os.FileInfo
 }
 
 // maxSources bounds the sources that are remembered; the list refills as
@@ -133,7 +141,7 @@ func (s *Service) Thumb(typ, href string, width, height int) (string, bool) {
 	if err != nil || s.tree.IsHidden(filepath.Base(requested)) {
 		return "", false
 	}
-	src, ok := s.tree.ResolveManagedFile(requested)
+	src, info, ok := s.tree.ResolveManagedFileInfo(requested)
 	if !ok {
 		return "", false
 	}
@@ -145,32 +153,30 @@ func (s *Service) Thumb(typ, href string, width, height int) (string, bool) {
 		return "", false
 	}
 
-	switch category {
-	case "img":
-		src, ok = s.captureImage(fileType, src)
-	case "mov":
-		src, ok = s.captureMov(fileType, src)
-	case "doc":
-		src, ok = s.captureDoc(fileType, src)
-	}
+	f, ok := s.tree.OpenChecked(src, info)
 	if !ok {
 		return "", false
 	}
-	name, ok := s.thumb(src, width, height)
+	defer f.Close()
+	id, err := sourceID(src, f, info)
+	if err != nil {
+		return "", false
+	}
+	name, ok := s.thumb(id, f, info, fileType, category, width, height)
 	if ok {
-		s.remember(name, requested)
+		s.remember(name, thumbSource{requested, src, info})
 	}
 	return name, ok
 }
 
 // remember notes the file a thumbnail was made of.
-func (s *Service) remember(name, requested string) {
+func (s *Service) remember(name string, source thumbSource) {
 	s.sourcesMu.Lock()
 	defer s.sourcesMu.Unlock()
 	if s.sources == nil || len(s.sources) >= maxSources {
-		s.sources = map[string]string{}
+		s.sources = map[string]thumbSource{}
 	}
-	s.sources[name] = requested
+	s.sources[name] = source
 }
 
 // forget drops the source of a thumbnail that was removed from the cache.
@@ -193,13 +199,13 @@ func (s *Service) ForgetSources() {
 // made when the thumbnail was created.
 func (s *Service) Allowed(name string) bool {
 	s.sourcesMu.Lock()
-	requested, ok := s.sources[name]
+	source, ok := s.sources[name]
 	s.sourcesMu.Unlock()
-	if !ok || s.tree.IsHidden(filepath.Base(requested)) {
+	if !ok || s.tree.IsHidden(filepath.Base(source.requested)) {
 		return false
 	}
-	_, ok = s.tree.ResolveManagedFile(requested)
-	return ok
+	real, info, ok := s.tree.ResolveManagedFileInfo(source.requested)
+	return ok && real == source.real && sameSource(info, source.info)
 }
 
 func validDimensions(w, h int) bool {
@@ -235,22 +241,17 @@ func (s *Service) category(fileType string) string {
 	return ""
 }
 
-func sourceID(path string) string {
-	sum := sha256.Sum224([]byte(path))
-	return hex.EncodeToString(sum[:])
-}
-
 func (s *Service) lock(name string) *sync.Mutex {
 	h := fnv.New32a()
 	h.Write([]byte(name))
 	return &s.locks[h.Sum32()%lockStripes]
 }
 
-// fresh reports whether a cache file exists and is newer than its source,
-// refreshing its time at most once a day for the LRU cleanup.
-func fresh(cached string, src os.FileInfo) bool {
+// fresh checks a cache entry named for a specific source version, and
+// refreshes its time at most once a day for the LRU cleanup.
+func fresh(cached string) bool {
 	fi, err := os.Stat(cached)
-	if err != nil || !src.ModTime().Before(fi.ModTime()) {
+	if err != nil || !fi.Mode().IsRegular() {
 		return false
 	}
 	if time.Since(fi.ModTime()) > touchInterval {
@@ -260,31 +261,61 @@ func fresh(cached string, src os.FileInfo) bool {
 	return true
 }
 
-func (s *Service) thumb(src string, width, height int) (string, bool) {
-	srcInfo, err := os.Stat(src)
-	if err != nil {
-		return "", false
-	}
-	name := fmt.Sprintf("thumb-%s-%dx%d.jpg", sourceID(src), width, height)
+func (s *Service) thumb(id string, source *os.File, info os.FileInfo, fileType, category string, width, height int) (string, bool) {
+	name := fmt.Sprintf("thumb-%s-%dx%d.jpg", id, width, height)
 	path := filepath.Join(s.dir, name)
-
 	mu := s.lock(name)
 	mu.Lock()
-	defer mu.Unlock()
-	if fresh(path, srcInfo) {
+	if fresh(path) {
+		mu.Unlock()
 		return name, true
 	}
-	if !s.reserve() {
+	mu.Unlock()
+
+	// Finish any conversion before taking the thumbnail lock. A capture and
+	// a thumbnail can hash to the same lock stripe.
+	var captured string
+	ok := true
+	switch category {
+	case "img":
+		if format, convert := magickImages[fileType]; convert {
+			captured, ok = s.captureImage(id, source, info, format)
+		}
+	case "mov":
+		captured, ok = s.captureMov(id, source, info, fileType)
+	case "doc":
+		captured, ok = s.captureDoc(id, source, info, fileType)
+	}
+	if !ok {
 		return "", false
 	}
-	if !s.acquire() {
+
+	mu.Lock()
+	defer mu.Unlock()
+	if fresh(path) {
+		return name, true
+	}
+	if !s.reserve() || !s.acquire() {
 		return "", false
 	}
-	// like h5fs: embedded EXIF thumbnails only for thumbnails, not samples
+	defer func() { <-s.sem }()
+	input := source
+	if captured != "" {
+		var err error
+		input, err = os.Open(captured)
+		if err != nil {
+			return "", false
+		}
+		defer input.Close()
+	}
+	// Embedded EXIF thumbnails are used only for thumbnails, not samples.
 	useExif := s.cfg.IsTrue("thumbnails.exif") && height != 0
-	img, err := render(src, width, height, useExif)
-	<-s.sem
+	img, err := render(input, width, height, useExif)
 	if err != nil {
+		return "", false
+	}
+	current, err := source.Stat()
+	if err != nil || !sameSource(current, info) {
 		return "", false
 	}
 	old := fileSize(path)
@@ -296,98 +327,88 @@ func (s *Service) thumb(src string, width, height int) (string, bool) {
 	return name, true
 }
 
-func (s *Service) captureMov(fileType, src string) (string, bool) {
+func (s *Service) captureMov(id string, source *os.File, info os.FileInfo, fileType string) (string, bool) {
 	format, ok := movFormats[fileType]
-	if !ok {
+	if !ok || !s.hasCmd("ffmpeg") {
 		return "", false
 	}
-	var cmd func(at, dest string) []string
-	switch {
-	case s.hasCmd("ffmpeg"):
-		// forcing the demuxer (and only allowing it and the file protocol)
-		// keeps ffmpeg from probing other formats or protocols (e.g. HLS)
-		cmd = func(at, dest string) []string {
+	return s.capture(id, source, info, maxExternalSourceBytes, func(src, dest string) [][]string {
+		// Force the demuxer and only allow the file protocol.
+		command := func(at string) []string {
 			return []string{"ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
 				"-protocol_whitelist", "file", "-format_whitelist", format, "-f", format,
 				"-ss", at, "-i", src, "-an", "-frames:v", "1", "-f", "image2", "-update", "1", dest}
 		}
-	default:
-		return "", false
-	}
-	// videos shorter than 10 seconds: fall back to the first frame
-	return s.capture(src, cmd("0:00:10", ""), cmd("0:00:00", ""))
+		return [][]string{command("0:00:10"), command("0:00:00")}
+	})
 }
 
-// captureImage converts images Go can't decode (AVIF, HEIC, ICO, JPEG 2000,
-// JPEG XL, TGA, TIFF, PSD) to JPEG with ImageMagick; other images are used as
-// they are. Transparent areas become white, CMYK is converted to sRGB.
-func (s *Service) captureImage(fileType, src string) (string, bool) {
-	format, ok := magickImages[fileType]
-	if !ok {
-		return src, true
-	}
-	if fi, err := os.Stat(src); err != nil || fi.Size() > maxMagickSourceBytes {
+func (s *Service) captureImage(id string, source *os.File, info os.FileInfo, format string) (string, bool) {
+	if info.Size() > maxMagickSourceBytes || !s.hasCmd("magick") {
 		return "", false
 	}
-	// an explicit coder: the input is never auto-detected from its content
-	in := format + ":" + src + "[0]"
-	resize := fmt.Sprintf("%dx%d>", maxThumbDimension, maxThumbDimension)
-	args := append([]string{"magick"}, magickLimits...)
-	args = append(args, in, "-auto-orient", "-colorspace", "sRGB", "-background", "white", "-alpha", "remove", "-alpha", "off",
-		"-resize", resize, "-quality", "90", "-strip", "jpg:")
-	if s.hasCmd("magick") {
-		return s.capture(src, args)
-	}
-	return "", false
+	return s.capture(id, source, info, maxMagickSourceBytes, func(src, dest string) [][]string {
+		in := format + ":" + src + "[0]"
+		resize := fmt.Sprintf("%dx%d>", maxThumbDimension, maxThumbDimension)
+		args := append([]string{"magick"}, magickLimits...)
+		args = append(args, in, "-auto-orient", "-colorspace", "sRGB", "-background", "white", "-alpha", "remove", "-alpha", "off",
+			"-resize", resize, "-quality", "90", "-strip", "jpg:"+dest)
+		return [][]string{args}
+	})
 }
 
-func (s *Service) captureDoc(fileType, src string) (string, bool) {
+func (s *Service) captureDoc(id string, source *os.File, info os.FileInfo, fileType string) (string, bool) {
 	format, ok := docFormats[fileType]
-	if !ok {
+	if !ok || !s.hasCmd("magick") {
 		return "", false
 	}
-	// an explicit coder: the input is never auto-detected from its content
-	in := format + ":" + src + "[0]"
-	if s.hasCmd("magick") {
-		// operators like -strip have to follow the input in ImageMagick 7
-		return s.capture(src, []string{"magick", "-density", "200", in, "-quality", "100", "-strip", "jpg:"})
-	}
-	return "", false
+	return s.capture(id, source, info, maxMagickSourceBytes, func(src, dest string) [][]string {
+		in := format + ":" + src + "[0]"
+		args := append([]string{"magick"}, magickLimits...)
+		args = append(args, "-density", "200", in, "-quality", "100", "-strip", "jpg:"+dest)
+		return [][]string{args}
+	})
 }
 
-// capture runs the first command line that produces a capture image. The
-// destination is appended to the last argument.
-func (s *Service) capture(src string, cmdlines ...[]string) (string, bool) {
-	srcInfo, err := os.Stat(src)
-	if err != nil {
+// capture converts an already opened source. The external tool gets a
+// private snapshot with a generated name, never a path in the share.
+func (s *Service) capture(id string, source *os.File, info os.FileInfo, limit int64, commands func(src, dest string) [][]string) (string, bool) {
+	if info.Size() <= 0 || info.Size() > limit {
 		return "", false
 	}
-	name := "capture-" + sourceID(src) + ".jpg"
+	name := "capture-" + id + ".jpg"
 	dest := filepath.Join(s.dir, name)
-
 	mu := s.lock(name)
 	mu.Lock()
 	defer mu.Unlock()
-	if fresh(dest, srcInfo) {
+	if fresh(dest) {
 		return dest, true
 	}
-	if !s.reserve() {
+	if !s.reserve() || !s.acquire() {
 		return "", false
 	}
+	defer func() { <-s.sem }()
+
+	snapshot, err := os.CreateTemp(s.dir, ".source-*")
+	if err != nil {
+		return "", false
+	}
+	defer os.Remove(snapshot.Name())
+	_, copyErr := io.CopyN(snapshot, source, info.Size())
+	closeErr := snapshot.Close()
+	current, err := source.Stat()
+	if copyErr != nil || closeErr != nil || err != nil || !sameSource(current, info) {
+		return "", false
+	}
+
 	old := fileSize(dest)
 	os.Remove(dest)
-	for _, args := range cmdlines {
-		args = slices.Clone(args)
-		args[len(args)-1] += dest
-		if !s.acquire() {
-			break
-		}
+	for _, args := range commands(snapshot.Name(), dest) {
 		ctx, cancel := context.WithTimeout(context.Background(), captureTimeout)
 		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 		cmd.WaitDelay = 5 * time.Second
 		err := cmd.Run()
 		cancel()
-		<-s.sem
 		if err == nil && fileSize(dest) > 0 {
 			break
 		}

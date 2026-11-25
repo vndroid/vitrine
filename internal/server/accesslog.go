@@ -86,9 +86,9 @@ func (r *recorder) ReadFrom(src io.Reader) (int64, error) {
 }
 
 func (r *recorder) Flush() {
-	if f, ok := r.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
+	_ = r.FlushError()
 }
+
+func (r *recorder) FlushError() error { return http.NewResponseController(r.ResponseWriter).Flush() }
 
 func (r *recorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }

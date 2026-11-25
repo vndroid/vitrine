@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 go build -trimpath -tags netgo -ldflags "-s -w \
       -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     -o /out/vitrine ./cmd/vitrine
 
-FROM alpine:3.23
+FROM alpine:3.23 AS runtime
 # ffmpeg: video thumbnails; imagemagick + ghostscript: pdf/ps thumbnails,
 # imagemagick-heic: AVIF/HEIC thumbnails, imagemagick-jpeg: jpeg output;
 # coreutils: "du" for foldersize.type "shell-du"
@@ -25,7 +25,8 @@ FROM alpine:3.23
 # group: files of either owner are readable when they are group or world
 # readable, and /cache is writable for both (setgid keeps the group).
 # "docker run --user www-data" runs vitrine as that user instead.
-RUN apk add --no-cache ffmpeg imagemagick imagemagick-heic imagemagick-jpeg ghostscript coreutils \
+RUN apk add --no-cache --upgrade ffmpeg imagemagick imagemagick-heic imagemagick-jpeg ghostscript coreutils \
+      libcrypto3 libssl3 zlib \
  && addgroup -S -g 1000 vitrine && adduser -S -u 1000 -G vitrine -H vitrine \
  && adduser -S -u 82 -G www-data -H www-data \
  && addgroup vitrine www-data \

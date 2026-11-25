@@ -36,12 +36,7 @@ var errSource = errors.New("thumb: unsupported or too large image")
 // the longer side. EXIF orientation is applied. With useExif the JPEG's
 // embedded EXIF thumbnail is used instead of decoding the whole photo,
 // if it is large enough and has the photo's aspect ratio.
-func render(path string, width, height int, useExif bool) (*image.RGBA, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+func render(f *os.File, width, height int, useExif bool) (*image.RGBA, error) {
 	fi, err := f.Stat()
 	if err != nil || fi.Size() <= 0 || fi.Size() > maxSourceBytes {
 		return nil, errSource

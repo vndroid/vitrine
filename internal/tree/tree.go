@@ -284,13 +284,13 @@ func (t *Tree) IsManagedHref(href string) bool {
 // be served: a regular file in a managed folder that is not hidden, both
 // for the path the client asked for and, inside the root, for the target.
 func (t *Tree) ResolveManagedFile(path string) (string, bool) {
-	real, _, ok := t.resolveFile(path)
+	real, _, ok := t.ResolveManagedFileInfo(path)
 	return real, ok
 }
 
-// resolveFile is ResolveManagedFile that also returns the FileInfo the
+// ResolveManagedFileInfo is ResolveManagedFile that also returns the FileInfo the
 // checks were made on.
-func (t *Tree) resolveFile(path string) (string, fs.FileInfo, bool) {
+func (t *Tree) ResolveManagedFileInfo(path string) (string, fs.FileInfo, bool) {
 	real, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", nil, false
@@ -318,7 +318,7 @@ func (t *Tree) resolveFile(path string) (string, fs.FileInfo, bool) {
 // checks and the open can't serve anything else. Inside the root the open
 // is confined to the root.
 func (t *Tree) OpenManagedFile(path string) (*os.File, bool) {
-	real, fi, ok := t.resolveFile(path)
+	real, fi, ok := t.ResolveManagedFileInfo(path)
 	if !ok {
 		return nil, false
 	}

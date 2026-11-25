@@ -43,6 +43,17 @@ func (s *Server) onLogin(w http.ResponseWriter, r *http.Request, p params) {
 		return
 	}
 	client := ClientID(c.addr)
+	// Hold the client slot through verification and recording the outcome.
+	// Also bound the CPU and memory used by concurrent password checks.
+	release, ok := s.loginSlots.Acquire(client, 4, 1)
+	if !ok {
+		w.Header().Set("Retry-After", "1")
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{
+			"asAdmin": false, "err": errBusy, "msg": "login busy, try again later",
+		})
+		return
+	}
+	defer release()
 	if wait := s.throttle.RetryAfter(client); wait > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
 		writeJSON(w, http.StatusTooManyRequests, map[string]any{

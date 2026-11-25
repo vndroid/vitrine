@@ -1,6 +1,8 @@
 package tree
 
 import (
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -9,6 +11,8 @@ import (
 var FilePrefixes = []string{"_vitrine"}
 
 var customExtensions = []string{"html", "md"}
+
+const maxCustomBytes = 1 << 20
 
 // CustomPart is a custom header or footer.
 type CustomPart struct {
@@ -66,12 +70,17 @@ func (t *Tree) readCustom(dir, name string, part *CustomPart) {
 	for _, prefix := range FilePrefixes {
 		for _, ext := range customExtensions {
 			fileName := prefix + "." + name + "." + ext
-			file, ok := t.resolveCustomFile(dir, fileName)
+			real, info, ok := t.resolveCustomFile(dir, fileName)
 			if !ok {
 				continue
 			}
-			data, err := os.ReadFile(file)
-			if err != nil {
+			file, ok := t.OpenChecked(real, info)
+			if !ok {
+				continue
+			}
+			data, err := io.ReadAll(io.LimitReader(file, maxCustomBytes+1))
+			file.Close()
+			if err != nil || len(data) > maxCustomBytes {
 				continue
 			}
 			content, typ := string(data), ext
@@ -85,20 +94,24 @@ func (t *Tree) readCustom(dir, name string, part *CustomPart) {
 // target must be a custom file in a folder inside the root (those are
 // usually hidden) or a regular visible file, so links can't expose files
 // outside of the root or hidden files.
-func (t *Tree) resolveCustomFile(dir, fileName string) (string, bool) {
+func (t *Tree) resolveCustomFile(dir, fileName string) (string, fs.FileInfo, bool) {
 	real, err := filepath.EvalSymlinks(filepath.Join(dir, fileName))
-	if err != nil {
-		return "", false
+	if err != nil || !within(real, t.root) {
+		return "", nil, false
 	}
 	fi, err := os.Stat(real)
-	if err != nil || !fi.Mode().IsRegular() || !readable(real) {
-		return "", false
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() > maxCustomBytes {
+		return "", nil, false
 	}
 	if filepath.Base(real) == fileName {
 		if _, ok := t.ResolveManagedPath(filepath.Dir(real)); ok {
-			return real, true
+			return real, fi, true
 		}
-		return "", false
+		return "", nil, false
 	}
-	return t.ResolveManagedFile(real)
+	target, checked, ok := t.ResolveManagedFileInfo(real)
+	if !ok || !within(target, t.root) {
+		return "", nil, false
+	}
+	return target, checked, true
 }

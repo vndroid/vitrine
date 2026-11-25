@@ -115,3 +115,22 @@ func TestLoginDisabledWithoutPasshash(t *testing.T) {
 		t.Error("unexpected passhash")
 	}
 }
+
+func TestLoginRejectsAnOccupiedClientSlot(t *testing.T) {
+	s := loginServer(t, "")
+	release, ok := s.loginSlots.Acquire("192.0.2.1", 4, 1)
+	if !ok {
+		t.Fatal("expected a free verification slot")
+	}
+	defer release()
+
+	code, res, _ := postAs(s, `{"action":"login","pass":"pw"}`, nil)
+	if code != http.StatusTooManyRequests || res["err"] != errBusy {
+		t.Fatalf("busy login = %d %v", code, res)
+	}
+	release()
+	code, res, _ = postAs(s, `{"action":"login","pass":"pw"}`, nil)
+	if code != http.StatusOK || res["asAdmin"] != true {
+		t.Fatalf("login after release = %d %v", code, res)
+	}
+}

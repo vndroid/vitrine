@@ -4,6 +4,18 @@ Versions follow `major.minor.patch`: small features and fixes raise the
 patch version, larger feature changes the minor version. The version lives
 in `cmd/vitrine/version.go`; releases are tagged by hand.
 
+## 0.4.14 - 2026-11-25
+
+- open custom headers and footers within the shared root and limit each
+  file to 1 MiB
+- read thumbnail sources through checked files and invalidate cache keys
+  when a source changes; external converters read private copies, with
+  a 256 MiB limit for documents and 1 GiB for videos
+- serialize password verification per client and limit concurrent
+  verifications across clients
+- enforce write deadlines on packaged downloads, including blocked writes
+- upgrade Alpine runtime packages during image builds
+
 ## 0.4.13 - 2026-11-21
 
 Dependencies:

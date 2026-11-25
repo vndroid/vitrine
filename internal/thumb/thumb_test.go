@@ -23,6 +23,15 @@ import (
 	"github.com/vndroid/vitrine/web"
 )
 
+func renderPath(path string, width, height int, exif bool) (*image.RGBA, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return render(f, width, height, exif)
+}
+
 // quadrants returns a w x h image: red top-left, green top-right, blue
 // bottom-left, white bottom-right.
 func quadrants(w, h int) image.Image {
@@ -115,7 +124,7 @@ func TestRenderSizes(t *testing.T) {
 		{small, 100, 0, 50, 20},
 	}
 	for _, tt := range tests {
-		img, err := render(tt.path, tt.w, tt.h, false)
+		img, err := renderPath(tt.path, tt.w, tt.h, false)
 		if err != nil {
 			t.Fatalf("render %s: %v", tt.path, err)
 		}
@@ -126,12 +135,12 @@ func TestRenderSizes(t *testing.T) {
 
 	// square crop of a landscape image: centered, so the middle shows the
 	// red/green border at the top
-	img, _ := render(land, 100, 100, false)
+	img, _ := renderPath(land, 100, 100, false)
 	if !near(img.At(10, 10), 255, 0, 0) || !near(img.At(90, 10), 0, 255, 0) {
 		t.Error("landscape crop not centered")
 	}
 	// portrait to landscape: top aligned like h5fs
-	img, _ = render(port, 100, 50, false)
+	img, _ = renderPath(port, 100, 50, false)
 	if !near(img.At(10, 10), 255, 0, 0) || !near(img.At(10, 45), 255, 0, 0) {
 		t.Error("portrait crop not top aligned")
 	}
@@ -145,7 +154,7 @@ func TestRenderRejectsBadSources(t *testing.T) {
 	} {
 		p := filepath.Join(dir, name)
 		writeFile(t, p, data)
-		if _, err := render(p, 100, 100, false); err == nil {
+		if _, err := renderPath(p, 100, 100, false); err == nil {
 			t.Errorf("render(%s) should fail", name)
 		}
 	}
@@ -154,7 +163,7 @@ func TestRenderRejectsBadSources(t *testing.T) {
 	var buf bytes.Buffer
 	png.Encode(&buf, image.NewGray(image.Rect(0, 0, 6000, 5000)))
 	writeFile(t, huge, buf.Bytes())
-	if _, err := render(huge, 100, 100, false); err == nil {
+	if _, err := renderPath(huge, 100, 100, false); err == nil {
 		t.Error("30 MP image should be rejected")
 	}
 }
@@ -171,7 +180,7 @@ func TestEXIFOrientation(t *testing.T) {
 		}
 		f.Close()
 
-		img, err := render(p, 100, 0, false)
+		img, err := renderPath(p, 100, 0, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -187,7 +196,7 @@ func TestEXIFOrientation(t *testing.T) {
 	for o := uint16(1); o <= 8; o++ {
 		p := filepath.Join(dir, "o.jpg")
 		writeFile(t, p, jpegWithOrientation(t, quadrants(200, 100), o, binary.BigEndian))
-		img, err := render(p, 240, 240, false)
+		img, err := renderPath(p, 240, 240, false)
 		if err != nil || img.Bounds().Dx() != 240 || img.Bounds().Dy() != 240 {
 			t.Errorf("orientation %d: %v %v", o, img.Bounds(), err)
 		}
@@ -245,9 +254,8 @@ func TestServiceThumb(t *testing.T) {
 	// source changed: regenerated
 	future := time.Now().Add(time.Hour)
 	os.Chtimes(filepath.Join(root, "a.png"), future, future)
-	s.Thumb("img", "/a.png", 240, 240)
-	if fi2, _ := os.Stat(p); fi2.ModTime().Equal(fi.ModTime()) {
-		t.Error("stale thumbnail not regenerated")
+	if updated, ok := s.Thumb("img", "/a.png", 240, 240); !ok || updated == name || s.Allowed(name) {
+		t.Error("changed source must get a new thumbnail and invalidate the old one")
 	}
 
 	for _, tt := range []struct {
@@ -420,7 +428,7 @@ func TestEmbeddedEXIFThumb(t *testing.T) {
 	for _, tt := range tests {
 		p := filepath.Join(dir, "p.jpg")
 		writeFile(t, p, jpegWithThumb(t, tt.photo, tt.thumb, tt.o))
-		img, err := render(p, tt.w, tt.h, tt.useExif)
+		img, err := renderPath(p, tt.w, tt.h, tt.useExif)
 		if err != nil {
 			t.Fatalf("%s: %v", tt.name, err)
 		}
@@ -431,7 +439,7 @@ func TestEmbeddedEXIFThumb(t *testing.T) {
 	// the rotated embedded thumbnail is turned like the photo
 	p := filepath.Join(dir, "r.jpg")
 	writeFile(t, p, jpegWithThumb(t, solid(640, 480, blue), solid(320, 240, red), 6))
-	img, _ := render(p, 180, 240, true)
+	img, _ := renderPath(p, 180, 240, true)
 	if b := img.Bounds(); b.Dx() != 180 || b.Dy() != 240 || !near(img.At(5, 5), 255, 0, 0) {
 		t.Errorf("rotated embedded thumb: %v", b)
 	}
@@ -714,7 +722,20 @@ func TestMagickTransparencyIsWhite(t *testing.T) {
 	if out, err := exec.Command("magick", "-size", "64x48", "xc:none", p).CombinedOutput(); err != nil {
 		t.Skipf("ImageMagick can't write TIFF here: %s", out)
 	}
-	capture, ok := s.captureImage("img-tiff", p)
+	source, err := os.Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close()
+	info, err := source.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := sourceID(p, source, info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	capture, ok := s.captureImage(id, source, info, "tiff")
 	if !ok {
 		t.Fatal("conversion failed")
 	}
@@ -752,9 +773,12 @@ func TestAllowedFollowsTheSource(t *testing.T) {
 	if s.Allowed(name) {
 		t.Error("the thumbnail of a file that is hidden now must not be allowed")
 	}
-	os.Rename(filepath.Join(root, ".a.png"), filepath.Join(root, "a.png"))
-	if !s.Allowed(name) {
-		t.Error("the thumbnail is allowed again once the file is back")
+	if err := os.Rename(filepath.Join(root, ".a.png"), filepath.Join(root, "a.png")); err != nil {
+		t.Fatal(err)
+	}
+	name, ok = s.Thumb("img", "/a.png", 240, 240)
+	if !ok || !s.Allowed(name) {
+		t.Error("the source can be requested again once the file is back")
 	}
 	s.ForgetSources()
 	if s.Allowed(name) {
@@ -789,12 +813,45 @@ func TestRemovedThumbnailsAreForgotten(t *testing.T) {
 func TestSourcesAreBounded(t *testing.T) {
 	s, _ := service(t, "")
 	for i := 0; i < maxSources+5; i++ {
-		s.remember("n"+strconv.Itoa(i), "/x")
+		s.remember("n"+strconv.Itoa(i), thumbSource{requested: "/x"})
 	}
 	s.sourcesMu.Lock()
 	n := len(s.sources)
 	s.sourcesMu.Unlock()
 	if n > maxSources {
 		t.Errorf("%d sources are remembered, the limit is %d", n, maxSources)
+	}
+}
+
+func TestThumbnailTracksSourceIdentity(t *testing.T) {
+	s, root := service(t, "")
+	path := filepath.Join(root, "a.png")
+	name, ok := s.Thumb("img", "/a.png", 240, 240)
+	if !ok {
+		t.Fatal("expected an initial thumbnail")
+	}
+	old, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Put a new file at the same name with the same time and size.
+	replacement := filepath.Join(root, "replacement.png")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, replacement, data)
+	if err := os.Chtimes(replacement, old.ModTime(), old.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(replacement, path); err != nil {
+		t.Fatal(err)
+	}
+	if s.Allowed(name) {
+		t.Fatal("the old thumbnail no longer belongs to the requested file")
+	}
+	next, ok := s.Thumb("img", "/a.png", 240, 240)
+	if !ok || !s.Allowed(next) {
+		t.Fatal("the replacement must have an authorized thumbnail")
 	}
 }

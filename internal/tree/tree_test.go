@@ -511,3 +511,15 @@ func TestLinkToHiddenShowsOwnMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestCustomFileSizeLimit(t *testing.T) {
+	tr, root := fixture(t)
+	file := filepath.Join(root, "sub", "_vitrine.header.html")
+	if err := os.WriteFile(file, make([]byte, maxCustomBytes+1), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	custom := tr.Custom("/sub/")
+	if custom.Header.Content == nil || *custom.Header.Content != "# header" {
+		t.Fatal("oversized customization should fall back to the parent")
+	}
+}

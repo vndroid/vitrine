@@ -354,3 +354,21 @@ func TestWriteAcceptsRewrittenFiles(t *testing.T) {
 		t.Error("a file rewritten in place was not packaged")
 	}
 }
+
+func TestRateWriterSetsDeadlineBeforeWrite(t *testing.T) {
+	now := time.Unix(0, 0)
+	want := now.Add(11 * time.Second)
+	w := &RateWriter{
+		W: io.Discard, MaxDuration: time.Minute, MinRate: 100, Grace: 10 * time.Second,
+		now: func() time.Time { return now },
+		SetWriteDeadline: func(deadline time.Time) error {
+			if !deadline.Equal(want) {
+				t.Errorf("deadline = %s, want %s", deadline, want)
+			}
+			return io.ErrClosedPipe
+		},
+	}
+	if n, err := w.Write(make([]byte, 100)); n != 0 || !errors.Is(err, io.ErrClosedPipe) {
+		t.Fatalf("failed deadline returned %d, %v", n, err)
+	}
+}

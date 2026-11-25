@@ -96,6 +96,7 @@ type Server struct {
 	readyState atomic.Int32
 	sessions   *auth.Sessions
 	throttle   *auth.Throttle
+	loginSlots *archive.Slots
 	slots      *archive.Slots
 	// thumbCalls limits concurrent thumbnail requests
 	thumbCalls *archive.Slots
@@ -116,6 +117,7 @@ func New(o Options) *Server {
 		log:        o.Logger,
 		sessions:   auth.NewSessions(),
 		throttle:   auth.NewThrottle(),
+		loginSlots: archive.NewSlots(),
 		slots:      archive.NewSlots(),
 		thumbCalls: archive.NewSlots(),
 	}

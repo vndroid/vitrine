@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -79,6 +80,16 @@ func (s *Server) onDownload(w http.ResponseWriter, r *http.Request, p params) {
 		return
 	}
 
+	controller := http.NewResponseController(w)
+	duration := time.Duration(max(s.cfg.Int("download.maxDuration", 3600), 1)) * time.Second
+	setDeadline := func(deadline time.Time) error {
+		err := controller.SetWriteDeadline(deadline)
+		if errors.Is(err, http.ErrNotSupported) {
+			return nil
+		}
+		return err
+	}
+
 	h := w.Header()
 	h.Set("Content-Type", "application/octet-stream")
 	h.Set("Content-Disposition", contentDisposition(packageName(as, ext)))
@@ -89,10 +100,11 @@ func (s *Server) onDownload(w http.ResponseWriter, r *http.Request, p params) {
 		}
 	}
 	rw := &archive.RateWriter{
-		W:           w,
-		MaxDuration: time.Duration(max(s.cfg.Int("download.maxDuration", 3600), 1)) * time.Second,
-		MinRate:     int64(max(s.cfg.Int("download.minRate", 32768), 0)),
-		Grace:       time.Duration(max(s.cfg.Int("download.minRateGrace", 30), 0)) * time.Second,
+		W:                w,
+		MaxDuration:      duration,
+		MinRate:          int64(max(s.cfg.Int("download.minRate", 32768), 0)),
+		Grace:            time.Duration(max(s.cfg.Int("download.minRateGrace", 30), 0)) * time.Second,
+		SetWriteDeadline: setDeadline,
 	}
 	if ext == ".tar" {
 		err = plan.WriteTar(rw)
@@ -105,6 +117,12 @@ func (s *Server) onDownload(w http.ResponseWriter, r *http.Request, p params) {
 		s.log.Info("download aborted", "client", client, "err", err)
 		panic(http.ErrAbortHandler)
 	}
+	// Flush within the deadline before clearing it, including small archives
+	// still buffered by net/http.
+	if err := controller.Flush(); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		panic(http.ErrAbortHandler)
+	}
+	_ = setDeadline(time.Time{})
 }
 
 // packageName cleans the requested name and makes sure it has the
