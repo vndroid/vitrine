@@ -3,6 +3,7 @@ package tree
 import (
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -74,6 +75,10 @@ func (t *Tree) readCustom(dir, name string, part *CustomPart) {
 			if !ok {
 				continue
 			}
+			if info.Size() > maxCustomBytes {
+				t.warnLargeCustom(real, info.Size())
+				continue
+			}
 			file, ok := t.OpenChecked(real, info)
 			if !ok {
 				continue
@@ -90,6 +95,14 @@ func (t *Tree) readCustom(dir, name string, part *CustomPart) {
 	}
 }
 
+// warnLargeCustom logs once per file that a custom file is ignored: it is
+// read for every listing of its folder.
+func (t *Tree) warnLargeCustom(path string, size int64) {
+	if _, seen := t.largeCustom.LoadOrStore(path, true); !seen {
+		slog.Warn("custom file ignored, it is too large", "file", path, "size", size, "limit", maxCustomBytes)
+	}
+}
+
 // resolveCustomFile resolves a custom file (maybe a symbolic link). The
 // target must be a custom file in a folder inside the root (those are
 // usually hidden) or a regular visible file, so links can't expose files
@@ -100,7 +113,7 @@ func (t *Tree) resolveCustomFile(dir, fileName string) (string, fs.FileInfo, boo
 		return "", nil, false
 	}
 	fi, err := os.Stat(real)
-	if err != nil || !fi.Mode().IsRegular() || fi.Size() > maxCustomBytes {
+	if err != nil || !fi.Mode().IsRegular() {
 		return "", nil, false
 	}
 	if filepath.Base(real) == fileName {

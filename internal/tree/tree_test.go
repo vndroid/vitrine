@@ -1,8 +1,10 @@
 package tree
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -521,5 +523,22 @@ func TestCustomFileSizeLimit(t *testing.T) {
 	custom := tr.Custom("/sub/")
 	if custom.Header.Content == nil || *custom.Header.Content != "# header" {
 		t.Fatal("oversized customization should fall back to the parent")
+	}
+}
+
+// An oversized custom file is ignored and logged once.
+func TestLargeCustomIsLoggedOnce(t *testing.T) {
+	tr, root := fixture(t)
+	if err := os.WriteFile(filepath.Join(root, "sub/_vitrine.header.html"), make([]byte, maxCustomBytes+1), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	defer slog.SetDefault(old)
+	tr.Custom("/sub/")
+	tr.Custom("/sub/")
+	if n := strings.Count(buf.String(), "too large"); n != 1 {
+		t.Errorf("logged %d times: %s", n, buf.String())
 	}
 }

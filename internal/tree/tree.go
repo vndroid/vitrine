@@ -28,6 +28,8 @@ type Tree struct {
 
 	sizeMu    sync.Mutex
 	sizeCache map[string]sizeEntry
+
+	largeCustom sync.Map // oversized custom files already logged
 }
 
 type sizeEntry struct {
