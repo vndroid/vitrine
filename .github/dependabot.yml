@@ -1,0 +1,13 @@
+# Actions are pinned to commits: Dependabot proposes the newer ones (it
+# updates the version comment too).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']
