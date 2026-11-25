@@ -7,10 +7,13 @@ in `cmd/vitrine/version.go`; releases are tagged by hand.
 ## 0.4.14 - 2026-11-25
 
 - open custom headers and footers within the shared root and limit each
-  file to 1 MiB
+  file to 1 MiB; a larger one is ignored and logged once
 - read thumbnail sources through checked files and invalidate cache keys
-  when a source changes; external converters read private copies, with
-  a 256 MiB limit for documents and 1 GiB for videos
+  when a source changes (existing thumbnails are made again once after the
+  upgrade); on Linux and macOS ffmpeg and ImageMagick read the checked
+  file through its open descriptor, without a copy and without a new size
+  limit
+- PDF and PostScript thumbnails run with the ImageMagick resource limits
 - serialize password verification per client and limit concurrent
   verifications across clients
 - enforce write deadlines on packaged downloads, including blocked writes

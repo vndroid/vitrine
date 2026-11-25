@@ -2,15 +2,14 @@ package thumb
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"syscall"
 )
 
-func addSourceIdentity(w io.Writer, _ *os.File, info os.FileInfo) error {
+// fileIdentity is the inode and the change time of a file.
+func fileIdentity(info os.FileInfo) string {
 	stat := info.Sys().(*syscall.Stat_t)
-	_, err := fmt.Fprintf(w, "%d:%d:%d:%d", stat.Dev, stat.Ino, stat.Ctimespec.Sec, stat.Ctimespec.Nsec)
-	return err
+	return fmt.Sprintf("%d:%d:%d", stat.Ino, stat.Ctimespec.Sec, stat.Ctimespec.Nsec)
 }
 
 func sameChangeTime(a, b os.FileInfo) bool {

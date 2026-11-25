@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -731,11 +732,7 @@ func TestMagickTransparencyIsWhite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, err := sourceID(p, source, info)
-	if err != nil {
-		t.Fatal(err)
-	}
-	capture, ok := s.captureImage(id, source, info, "tiff")
+	capture, ok := s.captureImage(checkedSource{sourceID(p, info), p, source, info}, "tiff")
 	if !ok {
 		t.Fatal("conversion failed")
 	}
@@ -853,5 +850,112 @@ func TestThumbnailTracksSourceIdentity(t *testing.T) {
 	next, ok := s.Thumb("img", "/a.png", 240, 240)
 	if !ok || !s.Allowed(next) {
 		t.Fatal("the replacement must have an authorized thumbnail")
+	}
+}
+
+// open returns a checked source for the file at path.
+func openSource(t *testing.T, path string) checkedSource {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { f.Close() })
+	info, err := f.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return checkedSource{sourceID(path, info), path, f, info}
+}
+
+// A converter reads the checked file, not whatever is at the path now, from
+// its start in every command, and no copy of the source is made.
+func TestCaptureReadsTheCheckedFile(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("converters get the path here")
+	}
+	s, root := service(t, "")
+	path := filepath.Join(root, "v.mp4")
+	writeFile(t, path, []byte("checked"))
+	src := openSource(t, path)
+	// the old name now leads to another file
+	if err := os.Rename(path, path+".moved"); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, path, []byte("swapped"))
+	// renaming changes the change time, which would discard the result
+	info, err := src.file.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	src.info = info
+
+	var during []string
+	dest, ok := s.capture(src, func(in, dest string) [][]string {
+		return [][]string{
+			{"sh", "-c", `cat "$1" >/dev/null; exit 1`, "sh", in},
+			{"sh", "-c", `cat "$1" >"$2"`, "sh", in, dest},
+		}
+	})
+	if !ok {
+		t.Fatal("capture failed")
+	}
+	if got, _ := os.ReadFile(dest); string(got) != "checked" {
+		t.Errorf("the converter read %q, want the checked file", got)
+	}
+	entries, _ := os.ReadDir(s.dir)
+	for _, e := range entries {
+		during = append(during, e.Name())
+	}
+	if len(during) != 1 {
+		t.Errorf("cache = %v, want only the capture", during)
+	}
+}
+
+// A source that changes during the conversion leaves nothing behind.
+func TestCaptureDiscardsChangedSource(t *testing.T) {
+	s, root := service(t, "")
+	path := filepath.Join(root, "v.mp4")
+	writeFile(t, path, []byte("before"))
+	src := openSource(t, path)
+	_, ok := s.capture(src, func(_, dest string) [][]string {
+		return [][]string{{"sh", "-c", `echo more >>"$1"; echo image >"$2"`, "sh", path, dest}}
+	})
+	if ok {
+		t.Error("the capture of a changed source was kept")
+	}
+	if entries, _ := os.ReadDir(s.dir); len(entries) != 0 {
+		t.Errorf("%d files left in the cache", len(entries))
+	}
+}
+
+// Videos and documents have no size limit.
+func TestLargeVideoAndDocumentAreConverted(t *testing.T) {
+	bin := t.TempDir()
+	// stand-ins that write to the destination, their last argument
+	for _, name := range []string{"ffmpeg", "magick"} {
+		script := "#!/bin/sh\nfor a; do last=$a; done\necho image >\"${last#jpg:}\"\n"
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	s, root := service(t, "")
+	s.hasCmd = func(string) bool { return true }
+	for _, name := range []string{"big.mp4", "big.pdf"} {
+		path := filepath.Join(root, name)
+		writeFile(t, path, nil)
+		if err := os.Truncate(path, 1<<30+1); err != nil {
+			t.Skipf("no sparse file here: %v", err)
+		}
+		var ok bool
+		if name == "big.mp4" {
+			_, ok = s.captureMov(openSource(t, path), "vid-mp4")
+		} else {
+			_, ok = s.captureDoc(openSource(t, path), "x-pdf")
+		}
+		if !ok {
+			t.Errorf("%s: not converted", name)
+		}
 	}
 }

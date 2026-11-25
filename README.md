@@ -193,6 +193,10 @@ Then run `vitrine validate -config <dir>` to check it. Notes:
   also in packaged downloads (which can run for hours): a file or folder that
   was replaced by a symbolic link in between is not followed. The names in a
   package have no backslash.
+- Thumbnails are made of the checked file too: on Linux and macOS ffmpeg and
+  ImageMagick get its open descriptor, not its path (on other systems they
+  get the path, and the result is dropped if the file changed meanwhile). A
+  custom header or footer larger than 1 MiB is ignored.
 - A cached thumbnail is only served while its source may be served: when the
   file is deleted, hidden or in a folder that is not listed anymore, the
   thumbnail is gone too. After a restart a thumbnail is served again once the
